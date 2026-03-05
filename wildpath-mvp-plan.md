@@ -34,10 +34,12 @@ This plan covers the full scope of the WildPath MVP, assigned across 5 people ov
 
 ## Architecture
 
-```
-User → Frontend (Map UI) → Backend API → Supabase DB
-                                    ↑
-              Python Pipeline ← MoveBank API
+```mermaid
+flowchart LR
+  movebank[MoveBank API] --> ingest[Python Pipeline]
+  ingest --> db[(Supabase DB)]
+  db <--> api[Express API]
+  api <--> ui[React Frontend]
 ```
 
 **Frontend calls:**
