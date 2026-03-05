@@ -164,14 +164,23 @@ python src/ingest.py
 
 ---
 
+## Contributing
+
+- **Do not push directly to `main`.** All changes go through pull requests.
+- Use a separate branch for each change:
+  - `feature/...` for new features (e.g. `feature/animal-selector`)
+  - `fix/...` for bug fixes (e.g. `fix/sightings-filter`)
+  - `style/...` for non-functional changes (e.g. formatting, docs)
+- Open a PR into `main` when the branch is ready; get a review before merging.
+
+---
+
 ## Team
 
 **Team DRAKKN**
 
-| Name         | Role                    |
-|--------------|-------------------------|
-| Kaitlyn Tran | Frontend Dev            |
-| Daniel Dovale | Backend Dev            |
-| Arnav        | Frontend Dev            |
-| Ronald       | Data Integration        |
-| Kavi Patel   | Backend Dev             |
+- Daniel Dovale (Team Lead)
+- Kaitlyn Tran
+- Arnav
+- Ronald
+- Kavi Patel

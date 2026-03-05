@@ -5,6 +5,7 @@
 This plan covers the full scope of the WildPath MVP, assigned across 5 people over **1–2 weeks**. Each section maps to specific tasks, code locations, and dependencies so everyone knows what to build, in what order, and what to wait on.
 
 **Effort sizes:**
+
 - **S** ≈ 0.5 day
 - **M** ≈ 1–2 days
 - **L** ≈ 3–4 days
@@ -13,15 +14,18 @@ This plan covers the full scope of the WildPath MVP, assigned across 5 people ov
 
 ## What We're Building
 
-| Feature | Description |
-|---|---|
-| Interactive 2D map | Mapbox GL JS showing wildlife sighting data from Supabase |
-| Animal/species search | Search and select a species to focus the map |
-| Markers & movement paths | Sighting markers with optional path overlays |
-| Filters | Filter by region (viewport), time range, and species |
-| Insights panel | Simple stats — counts per species, activity over time |
+
+| Feature                  | Description                                               |
+| ------------------------ | --------------------------------------------------------- |
+| Interactive 2D map       | Mapbox GL JS showing wildlife sighting data from Supabase |
+| Animal/species search    | Search and select a species to focus the map              |
+| Markers & movement paths | Sighting markers with optional path overlays              |
+| Filters                  | Filter by region (viewport), time range, and species      |
+| Insights panel           | Simple stats — counts per species, activity over time     |
+
 
 **Tech stack:**
+
 - `frontend/` — React + Vite, Mapbox, shadcn
 - `backend/` — Express + Supabase client
 - `pipeline/` — Python ingestion (MoveBank → Supabase)
@@ -37,6 +41,7 @@ User → Frontend (Map UI) → Backend API → Supabase DB
 ```
 
 **Frontend calls:**
+
 - `GET /api/animals` — species list + search
 - `GET /api/sightings` — markers/paths with filters
 - `GET /api/insights` — basic stats for current filters
@@ -55,30 +60,35 @@ User → Frontend (Map UI) → Backend API → Supabase DB
 
 Define the two core tables in Supabase:
 
-**`animals` table**
+`**animals` table**
 
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID | Primary key |
-| movebank_id | string | Unique |
-| name | text | Nullable |
-| scientific_name | text | |
-| common_name | text | |
-| species_group | text | Optional (e.g. "raptors") |
 
-**`sightings` table**
+| Column          | Type   | Notes                     |
+| --------------- | ------ | ------------------------- |
+| id              | UUID   | Primary key               |
+| movebank_id     | string | Unique                    |
+| name            | text   | Nullable                  |
+| scientific_name | text   |                           |
+| common_name     | text   |                           |
+| species_group   | text   | Optional (e.g. "raptors") |
 
-| Column | Type | Notes |
-|---|---|---|
-| id | UUID | Primary key |
-| animal_id | UUID | FK → animals.id |
-| movebank_individual_id | string | |
-| timestamp | timestamptz | Indexed |
-| latitude / longitude | numeric | Or PostGIS point |
-| geom | PostGIS geometry | Optional, for spatial indexing |
-| study_id | int | |
+
+`**sightings` table**
+
+
+| Column                 | Type             | Notes                          |
+| ---------------------- | ---------------- | ------------------------------ |
+| id                     | UUID             | Primary key                    |
+| animal_id              | UUID             | FK → animals.id                |
+| movebank_individual_id | string           |                                |
+| timestamp              | timestamptz      | Indexed                        |
+| latitude / longitude   | numeric          | Or PostGIS point               |
+| geom                   | PostGIS geometry | Optional, for spatial indexing |
+| study_id               | int              |                                |
+
 
 **Deliverables:**
+
 - Schema doc written in README.md (or `docs/schema.md`)
 - Tables and indexes created via Supabase SQL (index on `timestamp` and `latitude/longitude` or `geom`)
 
@@ -95,10 +105,10 @@ Build a working ingestion path for **one configured study**:
 1. `movebank.py` — implement `get_animals(study_id)` and `get_events(study_id)` using MoveBank API
 2. `transform.py` — implement `normalize_animals` and `normalize_events` to map MoveBank fields to DB schema
 3. `ingest.py` — implement `run(study_id)` to:
-   - Load env vars from `.env`
-   - Fetch animals + events
-   - Normalize with pandas
-   - Upsert into `animals` and `sightings` via Supabase Python client (batch ~500 rows)
+  - Load env vars from `.env`
+  - Fetch animals + events
+  - Normalize with pandas
+  - Upsert into `animals` and `sightings` via Supabase Python client (batch ~500 rows)
 
 **Dependencies:** Task 1.1 schema must be finalized first.
 
@@ -123,15 +133,18 @@ Build a working ingestion path for **one configured study**:
 
 Write a short spec covering all three endpoints. This is the contract that unblocks frontend work.
 
-**`GET /api/animals`**
+`**GET /api/animals`**
+
 - Params: `q` (search string), `limit` (default 20)
 - Response: `[{ id, common_name, scientific_name }]`
 
-**`GET /api/sightings`**
+`**GET /api/sightings**`
+
 - Params: `speciesId?`, `bbox?`, `start?`, `end?`, `limit?`
 - `bbox` format: `minLng,minLat,maxLng,maxLat`
 
-**`GET /api/insights`**
+`**GET /api/insights**`
+
 - Same filter params as `/api/sightings`
 - Response: `{ totalSightings, bySpecies, byDay }`
 
@@ -183,7 +196,7 @@ Write a short spec covering all three endpoints. This is the contract that unblo
 
 > **Owner: Person B** | `backend/src/index.ts`
 
-- Mount `animals`, `sightings`, and `insights` routers under `/api/*`
+- Mount `animals`, `sightings`, and `insights` routers under `/api/`*
 - Confirm `/health` endpoint works and is documented
 
 ---
@@ -283,6 +296,7 @@ Write a short spec covering all three endpoints. This is the contract that unblo
 > **Owner: Person E** (with all)
 
 Update root `README.md` to include:
+
 - How to run the pipeline with a sample study
 - How to seed Supabase with a tiny local dataset
 - Example `.env` values for local dev
@@ -293,37 +307,43 @@ Update root `README.md` to include:
 
 ### Person A — Data & Pipeline
 
-| Task | Description | Size |
-|---|---|---|
-| A1 | Design & document Supabase schema (§1.1) | L |
-| A2 | Implement ingestion pipeline for one MoveBank study (§1.2) | L |
-| A3 | Document pipeline usage + optional smoke test (§4.1–4.2) | S |
+
+| Task | Description                                                | Size |
+| ---- | ---------------------------------------------------------- | ---- |
+| A1   | Design & document Supabase schema (§1.1)                   | L    |
+| A2   | Implement ingestion pipeline for one MoveBank study (§1.2) | L    |
+| A3   | Document pipeline usage + optional smoke test (§4.1–4.2)   | S    |
+
 
 **Order:** A1 → A2 → A3. Can run in parallel with frontend/backend once A1 is agreed on.
 
 ---
 
-### Person B — Backend APIs
+### Daniel Dovale - Person B — Backend APIs
 
-| Task | Description | Size |
-|---|---|---|
-| B1 | Write API contract doc (§2.1) | S |
-| B2 | Implement `/api/animals` with search (§2.2) | M |
-| B3 | Implement `/api/sightings` with filters (§2.3) | M–L |
-| B4 | Implement `/api/insights` (§2.4) | M |
-| B5 | Add endpoint tests + README docs (§4.1–4.2) | M |
+
+| Task | Description                                    | Size |
+| ---- | ---------------------------------------------- | ---- |
+| B1   | Write API contract doc (§2.1)                  | S    |
+| B2   | Implement `/api/animals` with search (§2.2)    | M    |
+| B3   | Implement `/api/sightings` with filters (§2.3) | M–L  |
+| B4   | Implement `/api/insights` (§2.4)               | M    |
+| B5   | Add endpoint tests + README docs (§4.1–4.2)    | M    |
+
 
 **Order:** B1 first. Then B2 and B3 in parallel (both need schema from A1). B4 after B3. B5 after B2–B4 stabilize.
 
 ---
 
-### Person C — Frontend Map Core
+### Kaitlyn Tran - Person C — Frontend Map Core
 
-| Task | Description | Size |
-|---|---|---|
-| C1 | Map shell: full-screen layout + Mapbox wired (§3.1) | S–M |
-| C2 | Render sighting markers from backend data (§3.2) | M–L |
-| C3 | Add movement path toggle (§3.3) | M |
+
+| Task | Description                                         | Size |
+| ---- | --------------------------------------------------- | ---- |
+| C1   | Map shell: full-screen layout + Mapbox wired (§3.1) | S–M  |
+| C2   | Render sighting markers from backend data (§3.2)    | M–L  |
+| C3   | Add movement path toggle (§3.3)                     | M    |
+
 
 **Order:** C1 immediately (use mocked data). C2 once B3 has at least a stub. C3 after markers are working.
 
@@ -331,11 +351,13 @@ Update root `README.md` to include:
 
 ### Person D — Frontend Controls & Insights
 
-| Task | Description | Size |
-|---|---|---|
-| D1 | Build `AnimalSelector` search component (§3.4) | M |
-| D2 | Implement filters panel (region, time, species) (§3.5) | M |
-| D3 | Implement insights panel (§3.6) | M |
+
+| Task | Description                                            | Size |
+| ---- | ------------------------------------------------------ | ---- |
+| D1   | Build `AnimalSelector` search component (§3.4)         | M    |
+| D2   | Implement filters panel (region, time, species) (§3.5) | M    |
+| D3   | Implement insights panel (§3.6)                        | M    |
+
 
 **Order:** D1 after B1 API contract (mock B2 initially). D2 in parallel with D1 once filter format is agreed (B1/B3). D3 after B4 is available or stubbed.
 
@@ -343,10 +365,12 @@ Update root `README.md` to include:
 
 ### Person E — QA, Glue & Docs
 
-| Task | Description |
-|---|---|
-| E1 | Backend tests (with B), frontend tests (with C & D), README updates (§4.1–4.2) |
-| E2 *(optional)* | Help wire backend routes, verify `/health`, validate env examples |
+
+| Task            | Description                                                                    |
+| --------------- | ------------------------------------------------------------------------------ |
+| E1              | Backend tests (with B), frontend tests (with C & D), README updates (§4.1–4.2) |
+| E2 *(optional)* | Help wire backend routes, verify `/health`, validate env examples              |
+
 
 **Order:** E1 runs in parallel once initial endpoints and components exist (after B2/B3, D1/D2, C2). E2 can happen early to unblock local dev setup.
 
@@ -368,3 +392,4 @@ B1 (API contract)
   └─► D1 (animal selector UI)
   └─► D2 (filters panel)
 ```
+
