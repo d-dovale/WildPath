@@ -307,7 +307,7 @@ Update root `README.md` to include:
 
 ## Team Assignments & Sequence
 
-### Person A — Data & Pipeline
+### Arnav Bagmar — Data & Pipeline
 
 
 | Task | Description                                                | Size |
