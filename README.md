@@ -120,6 +120,8 @@ npm run dev:frontend   # http://localhost:5173
 npm run dev:backend    # http://localhost:3001
 ```
 
+Swagger UI for backend API docs is available at `http://localhost:3001/docs` when the backend server is running.
+
 ---
 
 ## Running the Data Pipeline
