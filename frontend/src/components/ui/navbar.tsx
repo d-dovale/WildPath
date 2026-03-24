@@ -1,4 +1,5 @@
-import { Search, Bell, Settings, User, Compass, Map as MapIcon, Leaf, Info } from 'lucide-react';
+import { Search, Bell, Settings, Compass, Map as MapIcon, Leaf, Info } from 'lucide-react';
+import * as React from 'react';
 
 export default function Navbar() {
   return (
@@ -15,6 +16,7 @@ export default function Navbar() {
           <input
             type="search"
             placeholder="Search wildlife or regions..."
+            aria-label="Search wildlife or regions"
             className="w-full bg-muted/50 border rounded-md py-1.5 pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
@@ -46,9 +48,12 @@ export default function Navbar() {
 
 function NavButton({ icon, label, active = false }: { icon: React.ReactNode, label: string, active?: boolean }) {
   return (
-    <button className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-      active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-    }`}>
+    <button
+      type="button"
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+        active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+      }`}
+    >
       {icon}
       <span className="hidden lg:inline">{label}</span>
     </button>
