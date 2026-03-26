@@ -49,13 +49,20 @@ paths:
                       common_name: Red Wolf
                       scientific_name: Canis rufus
         "400":
-          description: Invalid query parameter value.
+          description: >
+            Invalid query parameter. Returned when `limit` is not a positive
+            integer, or `q` is not a string.
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-              example:
-                error: Invalid limit parameter
+              examples:
+                invalidLimit:
+                  value:
+                    error: limit must be a positive integer
+                invalidQ:
+                  value:
+                    error: Invalid q parameter
         "500":
           description: Internal server error.
           content:
