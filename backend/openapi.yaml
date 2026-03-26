@@ -1,0 +1,96 @@
+openapi: 3.0.3
+info:
+  title: WildPath Backend API
+  version: 1.0.0
+  description: Manual OpenAPI spec for WildPath backend endpoints.
+servers:
+  - url: http://localhost:3001
+    description: Local development server
+paths:
+  /api/animals:
+    get:
+      summary: List species for the animal selector
+      description: Returns species rows with optional text search and result limit.
+      parameters:
+        - in: query
+          name: q
+          required: false
+          schema:
+            type: string
+            maxLength: 100
+          description: Optional case-insensitive search against common_name and scientific_name.
+          example: wolf
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 50
+          description: Maximum number of rows to return.
+          example: 20
+      responses:
+        "200":
+          description: Species list returned successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AnimalSpecies"
+              examples:
+                success:
+                  value:
+                    - id: 550e8400-e29b-41d4-a716-446655440000
+                      common_name: Gray Wolf
+                      scientific_name: Canis lupus
+                    - id: 6ba7b810-9dad-11d1-80b4-00c04fd430c8
+                      common_name: Red Wolf
+                      scientific_name: Canis rufus
+        "400":
+          description: >
+            Invalid query parameter. Returned when `limit` is not a positive
+            integer, or `q` is not a string.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidLimit:
+                  value:
+                    error: limit must be a positive integer
+                invalidQ:
+                  value:
+                    error: Invalid q parameter
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Internal Server Error
+components:
+  schemas:
+    AnimalSpecies:
+      type: object
+      required:
+        - id
+        - common_name
+        - scientific_name
+      properties:
+        id:
+          type: string
+          format: uuid
+        common_name:
+          type: string
+        scientific_name:
+          type: string
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string

@@ -54,6 +54,17 @@ The pipeline will:
 3. Normalize column names and parse timestamps
 4. Upsert animals and sightings into Supabase in batches
 
+## Target Supabase Tables
+
+The pipeline should write into these core tables in the `public` schema:
+
+- `public.species` (species-level attributes like `scientific_name`, `common_name`)
+- `public.animals` (individual tracked animals, linked to species and studies)
+- `public.sightings` (time + coordinate observations linked to animals)
+- `public.studies` (source metadata for imported datasets)
+
+Schema bootstrapping SQL lives in `supabase/migrations/` and should be applied before running ingestion.
+
 ## Module Overview
 
 | File              | Purpose                                              |
