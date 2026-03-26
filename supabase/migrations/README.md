@@ -8,6 +8,7 @@ Run the following files in Supabase SQL Editor, in order:
 4. `004_add_updated_at_triggers.sql`
 5. `005_add_trgm_indexes_for_search.sql`
 6. `006_restore_species_btree_indexes.sql`
+7. `007_add_trgm_indexes_on_species_columns.sql`
 
 ## Quick Validation Queries
 
