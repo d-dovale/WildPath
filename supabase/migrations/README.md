@@ -5,6 +5,7 @@ Run the following files in Supabase SQL Editor, in order:
 1. `001_init_core_tables.sql`
 2. `002_add_core_indexes.sql`
 3. `003_seed_species_test_data.sql`
+4. `004_add_updated_at_triggers.sql`
 
 ## Quick Validation Queries
 
