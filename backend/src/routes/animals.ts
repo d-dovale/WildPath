@@ -8,9 +8,9 @@ const DEFAULT_LIMIT = 20
 const MAX_LIMIT = 50
 const MAX_SEARCH_LENGTH = 100
 
-// Characters that have special meaning in PostgREST filter expressions.
-// Strip them before building the .or(...) string to prevent filter injection.
-const POSTGREST_SPECIAL = /[(),*%_\\]/g
+// Characters with special meaning in PostgREST filter expressions.
+// Includes field/operator separator (.), quoting chars ('"'), and other syntax chars.
+const POSTGREST_SPECIAL = /[().,*%_\\'"]/g
 
 function sanitizeSearchTerm(raw: string): string {
   return raw.trim().slice(0, MAX_SEARCH_LENGTH).replace(POSTGREST_SPECIAL, '')
@@ -26,8 +26,12 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         res.status(400).json({ error: 'Invalid limit parameter' })
         return
       }
-      const parsed = parseInt(limitParam, 10)
-      if (Number.isNaN(parsed) || parsed < 1) {
+      if (!/^\d+$/.test(limitParam.trim())) {
+        res.status(400).json({ error: 'limit must be a positive integer' })
+        return
+      }
+      const parsed = Number(limitParam.trim())
+      if (!Number.isInteger(parsed) || parsed < 1) {
         res.status(400).json({ error: 'limit must be a positive integer' })
         return
       }

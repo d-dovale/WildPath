@@ -7,6 +7,7 @@ Run the following files in Supabase SQL Editor, in order:
 3. `003_seed_species_test_data.sql`
 4. `004_add_updated_at_triggers.sql`
 5. `005_add_trgm_indexes_for_search.sql`
+6. `006_restore_species_btree_indexes.sql`
 
 ## Quick Validation Queries
 
