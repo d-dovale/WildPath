@@ -71,6 +71,101 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
                 error: Internal Server Error
+  /api/sightings:
+    get:
+      summary: List sightings with optional filters
+      description: >
+        Returns sighting records (location + timestamp per animal) with optional
+        filtering by species, bounding box, time range, and row limit.
+      parameters:
+        - in: query
+          name: speciesId
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Filter to sightings belonging to animals of this species UUID.
+          example: 550e8400-e29b-41d4-a716-446655440000
+        - in: query
+          name: bbox
+          required: false
+          schema:
+            type: string
+          description: >
+            Bounding box filter as four comma-separated numbers:
+            `minLng,minLat,maxLng,maxLat`. Values must be valid longitude/latitude ranges.
+          example: "-125,45,-110,50"
+        - in: query
+          name: start
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Lower bound on sighting timestamp (ISO 8601).
+          example: "2024-01-01T00:00:00Z"
+        - in: query
+          name: end
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Upper bound on sighting timestamp (ISO 8601).
+          example: "2024-06-30T23:59:59Z"
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            default: 1000
+            minimum: 1
+            maximum: 5000
+          description: Maximum number of sighting rows to return.
+          example: 500
+      responses:
+        "200":
+          description: Sightings list returned successfully.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Sighting"
+              example:
+                - id: 33333333-0000-0000-0000-000000000001
+                  animal_id: 22222222-0000-0000-0000-000000000001
+                  latitude: 48.2
+                  longitude: -110.5
+                  timestamp: "2024-01-05T08:00:00Z"
+        "400":
+          description: >
+            Invalid query parameter. Returned when `limit` is not a positive integer,
+            `speciesId` is not a valid UUID, `bbox` is malformed, or `start`/`end` are
+            not valid ISO 8601 date strings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidLimit:
+                  value:
+                    error: limit must be a positive integer
+                invalidSpeciesId:
+                  value:
+                    error: speciesId must be a valid UUID
+                invalidBbox:
+                  value:
+                    error: "bbox must be four numbers: minLng,minLat,maxLng,maxLat"
+                invalidStart:
+                  value:
+                    error: start must be a valid ISO 8601 date string
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Internal Server Error
 components:
   schemas:
     AnimalSpecies:
@@ -87,6 +182,28 @@ components:
           type: string
         scientific_name:
           type: string
+    Sighting:
+      type: object
+      required:
+        - id
+        - animal_id
+        - latitude
+        - longitude
+        - timestamp
+      properties:
+        id:
+          type: string
+          format: uuid
+        animal_id:
+          type: string
+          format: uuid
+        latitude:
+          type: number
+        longitude:
+          type: number
+        timestamp:
+          type: string
+          format: date-time
     ErrorResponse:
       type: object
       required:
