@@ -94,6 +94,7 @@ paths:
           description: >
             Bounding box filter as four comma-separated numbers:
             `minLng,minLat,maxLng,maxLat`. Values must be valid longitude/latitude ranges.
+            Require `minLng <= maxLng` and `minLat <= maxLat` (boxes crossing the antimeridian are not supported).
           example: "-125,45,-110,50"
         - in: query
           name: start
@@ -101,7 +102,9 @@ paths:
           schema:
             type: string
             format: date-time
-          description: Lower bound on sighting timestamp (ISO 8601).
+          description: >
+            Lower bound on sighting timestamp. Must be parseable by JavaScript `Date.parse`
+            (RFC 3339 / ISO-like strings are typical). Leading/trailing whitespace is trimmed.
           example: "2024-01-01T00:00:00Z"
         - in: query
           name: end
@@ -109,7 +112,9 @@ paths:
           schema:
             type: string
             format: date-time
-          description: Upper bound on sighting timestamp (ISO 8601).
+          description: >
+            Upper bound on sighting timestamp. Must be parseable by JavaScript `Date.parse`
+            (RFC 3339 / ISO-like strings are typical). Leading/trailing whitespace is trimmed.
           example: "2024-06-30T23:59:59Z"
         - in: query
           name: limit
@@ -139,8 +144,8 @@ paths:
         "400":
           description: >
             Invalid query parameter. Returned when `limit` is not a positive integer,
-            `speciesId` is not a valid UUID, `bbox` is malformed, or `start`/`end` are
-            not valid ISO 8601 date strings.
+            `speciesId` is not a valid UUID, `bbox` is malformed or has inverted min/max,
+            or `start`/`end` are not parseable date-time strings.
           content:
             application/json:
               schema:
@@ -155,9 +160,12 @@ paths:
                 invalidBbox:
                   value:
                     error: "bbox must be four numbers: minLng,minLat,maxLng,maxLat"
+                invalidBboxOrdering:
+                  value:
+                    error: "bbox minLng must be <= maxLng and minLat must be <= maxLat (antimeridian wrap not supported)"
                 invalidStart:
                   value:
-                    error: start must be a valid ISO 8601 date string
+                    error: start must be a parseable date-time string
         "500":
           description: Internal server error.
           content:

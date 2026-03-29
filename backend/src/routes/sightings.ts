@@ -10,6 +10,12 @@ const MAX_LIMIT = 5000
 // Basic UUID format check — prevents obviously bad values reaching PostgREST.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// Accepts strings JavaScript Date.parse understands (RFC3339/ISO-like, not strictly every ISO 8601 variant).
+function isParseableDateTime(s: string): boolean {
+  const t = Date.parse(s)
+  return !Number.isNaN(t)
+}
+
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     // --- limit ---
@@ -63,71 +69,116 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         res.status(400).json({ error: 'bbox must be four numbers: minLng,minLat,maxLng,maxLat' })
         return
       }
+      if (parts[0] > parts[2] || parts[1] > parts[3]) {
+        res.status(400).json({
+          error: 'bbox minLng must be <= maxLng and minLat must be <= maxLat (antimeridian wrap not supported)',
+        })
+        return
+      }
       bbox = parts as [number, number, number, number]
     }
 
-    // --- start / end ---
+    // --- start / end (trimmed; validated with Date.parse) ---
     const startParam = req.query.start
     let start: string | undefined
     if (startParam !== undefined) {
-      if (typeof startParam !== 'string' || isNaN(Date.parse(startParam))) {
-        res.status(400).json({ error: 'start must be a valid ISO 8601 date string' })
+      if (typeof startParam !== 'string') {
+        res.status(400).json({ error: 'start must be a parseable date-time string' })
         return
       }
-      start = startParam
+      const trimmed = startParam.trim()
+      if (trimmed.length === 0 || !isParseableDateTime(trimmed)) {
+        res.status(400).json({ error: 'start must be a parseable date-time string' })
+        return
+      }
+      start = trimmed
     }
 
     const endParam = req.query.end
     let end: string | undefined
     if (endParam !== undefined) {
-      if (typeof endParam !== 'string' || isNaN(Date.parse(endParam))) {
-        res.status(400).json({ error: 'end must be a valid ISO 8601 date string' })
+      if (typeof endParam !== 'string') {
+        res.status(400).json({ error: 'end must be a parseable date-time string' })
         return
       }
-      end = endParam
+      const trimmed = endParam.trim()
+      if (trimmed.length === 0 || !isParseableDateTime(trimmed)) {
+        res.status(400).json({ error: 'end must be a parseable date-time string' })
+        return
+      }
+      end = trimmed
     }
 
-    // --- build query ---
-    // Always join animals so the speciesId filter can reference animals.species_id.
-    // Using a static select string keeps the Supabase TypeScript inference stable.
-    let query = supabase
-      .from('sightings')
-      .select('id, animal_id, latitude, longitude, timestamp, animals!inner(species_id)')
-      .order('timestamp', { ascending: true })
-      .limit(limit)
-
+    // Two select shapes keep Supabase TypeScript inference stable:
+    // - with speciesId: inner join animals for filtering
+    // - without: no join (avoids unnecessary work)
     if (speciesId) {
-      query = query.eq('animals.species_id', speciesId)
+      let query = supabase
+        .from('sightings')
+        .select('id, animal_id, latitude, longitude, timestamp, animals!inner(species_id)')
+        .order('timestamp', { ascending: true })
+        .limit(limit)
+        .eq('animals.species_id', speciesId)
+
+      if (bbox) {
+        const [minLng, minLat, maxLng, maxLat] = bbox
+        query = query
+          .gte('longitude', minLng)
+          .lte('longitude', maxLng)
+          .gte('latitude', minLat)
+          .lte('latitude', maxLat)
+      }
+
+      if (start) {
+        query = query.gte('timestamp', start)
+      }
+
+      if (end) {
+        query = query.lte('timestamp', end)
+      }
+
+      const { data, error } = await query
+
+      if (error) {
+        next(error)
+        return
+      }
+
+      const rows = (data ?? []).map(({ animals: _animals, ...rest }) => rest)
+      res.json(rows)
+    } else {
+      let query = supabase
+        .from('sightings')
+        .select('id, animal_id, latitude, longitude, timestamp')
+        .order('timestamp', { ascending: true })
+        .limit(limit)
+
+      if (bbox) {
+        const [minLng, minLat, maxLng, maxLat] = bbox
+        query = query
+          .gte('longitude', minLng)
+          .lte('longitude', maxLng)
+          .gte('latitude', minLat)
+          .lte('latitude', maxLat)
+      }
+
+      if (start) {
+        query = query.gte('timestamp', start)
+      }
+
+      if (end) {
+        query = query.lte('timestamp', end)
+      }
+
+      const { data, error } = await query
+
+      if (error) {
+        next(error)
+        return
+      }
+
+      res.json(data ?? [])
     }
-
-    if (bbox) {
-      const [minLng, minLat, maxLng, maxLat] = bbox
-      query = query
-        .gte('longitude', minLng)
-        .lte('longitude', maxLng)
-        .gte('latitude', minLat)
-        .lte('latitude', maxLat)
-    }
-
-    if (start) {
-      query = query.gte('timestamp', start)
-    }
-
-    if (end) {
-      query = query.lte('timestamp', end)
-    }
-
-    const { data, error } = await query
-
-    if (error) {
-      next(error)
-      return
-    }
-
-    // Strip the joined animals object from each row — it was only needed for filtering.
-    const rows = (data ?? []).map(({ animals: _animals, ...rest }) => rest)
-
-    res.json(rows)
   } catch (err) {
     next(err)
   }
