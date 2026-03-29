@@ -3,6 +3,11 @@
 -- Sightings are spread across different timestamps, lat/lng, and animals
 -- to exercise speciesId, bbox, start/end, and limit filters.
 -- Run after 003_seed_species_test_data.sql.
+--
+-- Test-only seed: remove or replace when the MoveBank pipeline is live.
+-- Uses fixed UUIDs and ON CONFLICT (id) DO NOTHING for reruns. If another row
+-- already exists with the same movebank_id but a different id, inserts can fail
+-- on the animals.movebank_id unique constraint — expected only on dirty/non-dev DBs.
 
 -- Study
 insert into public.studies (id, source, source_id, name)

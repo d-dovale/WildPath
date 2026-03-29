@@ -57,10 +57,26 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         res.status(400).json({ error: 'Invalid bbox parameter' })
         return
       }
-      const parts = bboxParam.split(',').map(Number)
+      const rawSegments = bboxParam.split(',')
+      if (rawSegments.length !== 4) {
+        res.status(400).json({ error: 'bbox must be four numbers: minLng,minLat,maxLng,maxLat' })
+        return
+      }
+      const parts: number[] = []
+      for (const seg of rawSegments) {
+        const t = seg.trim()
+        if (t === '') {
+          res.status(400).json({ error: 'bbox must be four numbers: minLng,minLat,maxLng,maxLat' })
+          return
+        }
+        const n = Number(t)
+        if (!Number.isFinite(n)) {
+          res.status(400).json({ error: 'bbox must be four numbers: minLng,minLat,maxLng,maxLat' })
+          return
+        }
+        parts.push(n)
+      }
       if (
-        parts.length !== 4 ||
-        parts.some(isNaN) ||
         parts[0] < -180 || parts[0] > 180 ||
         parts[2] < -180 || parts[2] > 180 ||
         parts[1] < -90  || parts[1] > 90  ||
