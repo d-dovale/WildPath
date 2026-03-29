@@ -7,6 +7,7 @@ import swaggerUi from 'swagger-ui-express'
 import yaml from 'js-yaml'
 import animalsRouter from './routes/animals'
 import sightingsRouter from './routes/sightings'
+import insightsRouter from './routes/insights'
 import { errorHandler } from './middleware/errorHandler'
 
 const app = express()
@@ -36,6 +37,7 @@ if (ENABLE_SWAGGER_DOCS) {
 
 app.use('/api/animals', animalsRouter)
 app.use('/api/sightings', sightingsRouter)
+app.use('/api/insights', insightsRouter)
 
 app.use(errorHandler)
 

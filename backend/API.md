@@ -19,11 +19,11 @@ Base URL in development: `http://localhost:3001`. All API routes live under `/ap
 
 Body: array of objects:
 
-| Field             | Type   | Description        |
-|-------------------|--------|--------------------|
-| `id`              | UUID   | Animal primary key |
-| `common_name`     | string | Common name        |
-| `scientific_name` | string | Scientific name    |
+| Field             | Type   | Description                                                |
+|-------------------|--------|------------------------------------------------------------|
+| `id`              | UUID   | Species primary key (`species.id`); use as `speciesId` on map APIs |
+| `common_name`     | string | Common name                                                |
+| `scientific_name` | string | Scientific name                                            |
 
 **Example request:**
 
@@ -50,11 +50,11 @@ GET /api/animals?q=wolf&limit=20
 
 | Name        | Type   | Required | Description                                                                 |
 |-------------|--------|----------|-----------------------------------------------------------------------------|
-| `speciesId` | UUID   | No       | Only return sightings for this animal.                                     |
+| `speciesId` | UUID   | No       | Filter sightings to animals of **this species** — UUID from `/api/animals` `id` (`species.id`). Omit to include all species (within bbox/time/`limit`). |
 | `bbox`      | string | No       | Bounding box: `minLng,minLat,maxLng,maxLat` (e.g. `-122.5,37.7,-122.3,37.9`). |
 | `start`     | string | No       | Start of time range (ISO date or datetime, e.g. `2024-01-01` or `2024-01-01T00:00:00.000Z`). |
 | `end`       | string | No       | End of time range (ISO date or datetime).                                  |
-| `limit`     | number | No       | Max rows returned. Default: 5000.                                          |
+| `limit`     | number | No       | Max rows returned. Default: 1000; capped at 5000.                            |
 
 **Response:** `200 OK`
 
@@ -80,7 +80,7 @@ GET /api/sightings?speciesId=550e8400-e29b-41d4-a716-446655440000&bbox=-10,35,10
 [
   {
     "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "animal_id": "550e8400-e29b-41d4-a716-446655440000",
+    "animal_id": "22222222-0000-0000-0000-000000000001",
     "latitude": 45.5,
     "longitude": -122.6,
     "timestamp": "2024-03-15T14:30:00.000Z"
@@ -103,8 +103,8 @@ Body: object:
 | Field            | Type   | Description                                  |
 |------------------|--------|----------------------------------------------|
 | `totalSightings` | number | Total count of sightings matching the filters |
-| `bySpecies`      | array  | `[{ animal_id (UUID), count (number) }]`     |
-| `byDay`          | array  | `[{ date (string), count (number) }]` for a simple trend (e.g. daily counts). |
+| `bySpecies`      | array  | `[{ animal_id (UUID), count (number) }]` — per tracked individual (`animals.id`), not per species row |
+| `byDay`          | array  | `[{ date (string), count (number) }]` — UTC calendar date `YYYY-MM-DD` |
 
 **Example request:**
 
@@ -118,7 +118,7 @@ GET /api/insights?speciesId=550e8400-e29b-41d4-a716-446655440000&start=2024-01-0
 {
   "totalSightings": 1250,
   "bySpecies": [
-    { "animal_id": "550e8400-e29b-41d4-a716-446655440000", "count": 1250 }
+    { "animal_id": "22222222-0000-0000-0000-000000000001", "count": 800 }
   ],
   "byDay": [
     { "date": "2024-01-15", "count": 42 },
@@ -126,6 +126,20 @@ GET /api/insights?speciesId=550e8400-e29b-41d4-a716-446655440000&start=2024-01-0
   ]
 }
 ```
+
+---
+
+## Future (not implemented)
+
+**Use case:** A user searches “wolf” in the selector but does **not** pick a single species row. They want sightings for **every species** that matched the search (e.g. Gray Wolf and Red Wolf together), or a broader taxonomic group — not “one species” and not “everything in the viewport.”
+
+**Not in the API today.** That would need something like:
+
+- Multiple parallel requests per chosen UUID, or a multi-value param such as **`speciesIds`**
+- A **`q` / search token** passed through to the backend so results match the same species set as the dropdown
+- A taxonomy or **`species_group`** field on animals (see MVP schema notes) or similar grouping
+
+Omitting `speciesId` on `/api/sightings` / `/api/insights` today means **no species filter**: all species in the bbox/time window (subject to row limits on `/api/sightings`), **not** “only species whose names matched wolf.”
 
 ---
 

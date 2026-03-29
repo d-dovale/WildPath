@@ -2,7 +2,15 @@ openapi: 3.0.3
 info:
   title: WildPath Backend API
   version: 1.0.0
-  description: Manual OpenAPI spec for WildPath backend endpoints.
+  description: >
+    Manual OpenAPI spec for WildPath backend endpoints.
+
+    Species filter: `GET /api/animals` returns species rows; each response `id` is `species.id`.
+    Optional `speciesId` on `/api/sightings` and `/api/insights` restricts to animals with that
+    `species_id` (same UUID as `/api/animals` `id`). Omitting `speciesId` applies no species filter
+    (all species in bbox/time, subject to row limits)—not "only species that matched a search text."
+    Future work may add multi-species or search-scoped queries (e.g. `speciesIds`, a search token, or
+    taxonomy / `species_group`); see `backend/API.md` section "Future (not implemented)".
 servers:
   - url: http://localhost:3001
     description: Local development server
@@ -84,7 +92,9 @@ paths:
           schema:
             type: string
             format: uuid
-          description: Filter to sightings belonging to animals of this species UUID.
+          description: >
+            Filter to animals of this species. Use the same UUID as the `id` field on a row from
+            `GET /api/animals`. Omit for all species (within bbox/time/limit).
           example: 550e8400-e29b-41d4-a716-446655440000
         - in: query
           name: bbox
@@ -174,10 +184,85 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
               example:
                 error: Internal Server Error
+  /api/insights:
+    get:
+      summary: Aggregated sighting statistics for current filters
+      description: >
+        Returns counts aligned with the same filters as `/api/sightings` (`speciesId`, `bbox`, `start`, `end`).
+        The `limit` query parameter is ignored if present (aggregates are not row-limited).
+      parameters:
+        - in: query
+          name: speciesId
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: >
+            Same as `/api/sightings` `speciesId`: species UUID from `GET /api/animals` `id`.
+            Omit for all species (within bbox/time).
+          example: 550e8400-e29b-41d4-a716-446655440000
+        - in: query
+          name: bbox
+          required: false
+          schema:
+            type: string
+          description: >
+            Bounding box as `minLng,minLat,maxLng,maxLat`. Same rules as `/api/sightings`.
+          example: "-125,45,-110,50"
+        - in: query
+          name: start
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Lower bound on sighting timestamp (same parsing rules as `/api/sightings`).
+          example: "2024-01-01T00:00:00Z"
+        - in: query
+          name: end
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Upper bound on sighting timestamp (same parsing rules as `/api/sightings`).
+          example: "2024-06-30T23:59:59Z"
+      responses:
+        "200":
+          description: Aggregates returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InsightsResponse"
+              example:
+                totalSightings: 1250
+                bySpecies:
+                  - animal_id: "22222222-0000-0000-0000-000000000001"
+                    count: 800
+                  - animal_id: "22222222-0000-0000-0000-000000000002"
+                    count: 450
+                byDay:
+                  - date: "2024-01-15"
+                    count: 42
+                  - date: "2024-01-16"
+                    count: 38
+        "400":
+          description: Invalid query parameter (same validation as `/api/sightings` filters).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Internal Server Error
 components:
   schemas:
     AnimalSpecies:
       type: object
+      description: A row from `public.species` (selector/search), not an individual tracked animal.
       required:
         - id
         - common_name
@@ -186,6 +271,7 @@ components:
         id:
           type: string
           format: uuid
+          description: Species primary key; pass as `speciesId` on map endpoints.
         common_name:
           type: string
         scientific_name:
@@ -219,3 +305,49 @@ components:
       properties:
         error:
           type: string
+    InsightsResponse:
+      type: object
+      required:
+        - totalSightings
+        - bySpecies
+        - byDay
+      properties:
+        totalSightings:
+          type: integer
+          format: int64
+          description: Total sightings matching the filter set.
+        bySpecies:
+          type: array
+          description: Per tracked animal (`animals.id`) counts, descending by count.
+          items:
+            $ref: "#/components/schemas/InsightsByAnimal"
+        byDay:
+          type: array
+          description: Daily counts in UTC (`YYYY-MM-DD`).
+          items:
+            $ref: "#/components/schemas/InsightsByDay"
+    InsightsByAnimal:
+      type: object
+      required:
+        - animal_id
+        - count
+      properties:
+        animal_id:
+          type: string
+          format: uuid
+        count:
+          type: integer
+          format: int64
+    InsightsByDay:
+      type: object
+      required:
+        - date
+        - count
+      properties:
+        date:
+          type: string
+          description: Calendar date in UTC.
+          example: "2024-01-15"
+        count:
+          type: integer
+          format: int64
