@@ -4,6 +4,19 @@ Base URL in development: `http://localhost:3001`. All API routes live under `/ap
 
 ---
 
+## End-to-end flow (client)
+
+Typical map + insights usage:
+
+1. **`GET /api/species?q=…`** — User searches; each row’s **`id`** is **`species.id`** (not an individual animal).
+2. **Pick one species** — Store that **`id`** as the value for **`species_id`** on the next calls.
+3. **`GET /api/sightings`** — Pass **`species_id`**, optional **`bbox`**, **`start`**, **`end`**, **`limit`**. Rows include **`animal_id`** (`animals.id`, the tracked individual) and coordinates for markers.
+4. **`GET /api/insights`** — Use the **same** **`species_id`**, **`bbox`**, **`start`**, **`end`** as sightings (omit relying on **`limit`** for totals). Response: **`totalSightings`**, **`byAnimal`** (counts per **`animal_id`**), **`byDay`** (UTC dates).
+
+Omitting **`species_id`** means no species filter (all species in bbox/time, subject to sightings **`limit`** on the list endpoint).
+
+---
+
 ## GET /api/species
 
 **Purpose:** List species for the animal selector and search.

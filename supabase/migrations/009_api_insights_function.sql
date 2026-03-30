@@ -80,5 +80,13 @@ grant execute on function public.api_insights(
   timestamptz
 ) to service_role;
 
-comment on function public.api_insights is
+comment on function public.api_insights(
+  uuid,
+  double precision,
+  double precision,
+  double precision,
+  double precision,
+  timestamptz,
+  timestamptz
+) is
   'Returns totalSightings, bySpecies (per animal_id), byDay (UTC date) for optional species/bbox/time filters.';

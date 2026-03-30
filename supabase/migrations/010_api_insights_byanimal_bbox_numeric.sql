@@ -71,5 +71,23 @@ select jsonb_build_object(
 );
 $$;
 
-comment on function public.api_insights is
+grant execute on function public.api_insights(
+  uuid,
+  double precision,
+  double precision,
+  double precision,
+  double precision,
+  timestamptz,
+  timestamptz
+) to service_role;
+
+comment on function public.api_insights(
+  uuid,
+  double precision,
+  double precision,
+  double precision,
+  double precision,
+  timestamptz,
+  timestamptz
+) is
   'Returns JSON with totalSightings (bigint), byAnimal (animal_id/count per tracked individual), and byDay (YYYY-MM-DD/count in UTC) for optional species/bbox/time filters.';
