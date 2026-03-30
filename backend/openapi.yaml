@@ -46,7 +46,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/AnimalSpecies"
+                  $ref: "#/components/schemas/Species"
               examples:
                 success:
                   value:
@@ -260,7 +260,7 @@ paths:
                 error: Internal Server Error
 components:
   schemas:
-    AnimalSpecies:
+    Species:
       type: object
       description: A row from `public.species` (selector/search), not an individual tracked animal.
       required:
