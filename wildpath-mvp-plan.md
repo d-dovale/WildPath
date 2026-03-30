@@ -327,7 +327,7 @@ Update root `README.md` to include:
 | Task | Description                                    | Size |
 | ---- | ---------------------------------------------- | ---- |
 | B1   | Write API contract doc (§2.1)                  | S    |
-| B2   | Implement `/api/animals` with search (§2.2)    | M    |
+| B2   | Implement `/api/species` with search (§2.2)    | M    |
 | B3   | Implement `/api/sightings` with filters (§2.3) | M–L  |
 | B4   | Implement `/api/insights` (§2.4)               | M    |
 | B5   | Add endpoint tests + README docs (§4.1–4.2)    | M    |
