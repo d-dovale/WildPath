@@ -1,7 +1,7 @@
 -- Seed data for testing GET /api/sightings
 -- Inserts 1 study, 3 animals (Gray Wolf, Bald Eagle, Jaguar), and 15 sightings.
 -- Sightings are spread across different timestamps, lat/lng, and animals
--- to exercise speciesId, bbox, start/end, and limit filters.
+-- to exercise species_id, bbox, start/end, and limit filters.
 -- Run after 003_seed_species_test_data.sql.
 --
 -- Test-only seed: remove or replace when the MoveBank pipeline is live.

@@ -10,6 +10,8 @@ Run the following files in Supabase SQL Editor, in order:
 6. `006_restore_species_btree_indexes.sql`
 7. `007_add_trgm_indexes_on_species_columns.sql`
 8. `008_seed_sightings_test_data.sql`
+9. `009_api_insights_function.sql`
+10. `010_api_insights_byanimal_bbox_numeric.sql`
 
 ## Quick Validation Queries
 

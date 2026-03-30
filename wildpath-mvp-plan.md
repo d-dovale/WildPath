@@ -44,7 +44,7 @@ flowchart LR
 
 **Frontend calls:**
 
-- `GET /api/animals` — species list + search
+- `GET /api/species` — species list + search
 - `GET /api/sightings` — markers/paths with filters
 - `GET /api/insights` — basic stats for current filters
 
@@ -135,28 +135,28 @@ Build a working ingestion path for **one configured study**:
 
 Write a short spec covering all three endpoints. This is the contract that unblocks frontend work.
 
-`**GET /api/animals`**
+`**GET /api/species`**
 
 - Params: `q` (search string), `limit` (default 20)
 - Response: `[{ id, common_name, scientific_name }]`
 
 `**GET /api/sightings**`
 
-- Params: `speciesId?`, `bbox?`, `start?`, `end?`, `limit?`
+- Params: `species_id?`, `bbox?`, `start?`, `end?`, `limit?`
 - `bbox` format: `minLng,minLat,maxLng,maxLat`
 
 `**GET /api/insights**`
 
 - Same filter params as `/api/sightings`
-- Response: `{ totalSightings, bySpecies, byDay }`
+- Response: `{ totalSightings, byAnimal, byDay }`
 
 ---
 
-### Task 2.2 — `GET /api/animals` Endpoint *(M, sequential)*
+### Task 2.2 — `GET /api/species` Endpoint *(M, sequential)*
 
-> **Owner: Person B** | `backend/src/routes/animals.ts`
+> **Owner: Person B** | `backend/src/routes/species.ts`
 
-- Query Supabase `animals` table, ordered by `common_name`
+- Query Supabase `species` table, ordered by `common_name`
 - If `q` is provided: case-insensitive `ilike` on `common_name` and `scientific_name`
 - Limit results to 20–50 for search dropdown performance
 
@@ -168,9 +168,9 @@ Write a short spec covering all three endpoints. This is the contract that unblo
 
 > **Owner: Person B** | `backend/src/routes/sightings.ts`
 
-- Parse params: `speciesId`, `bbox`, `start`, `end`, `limit`
+- Parse params: `species_id`, `bbox`, `start`, `end`, `limit`
 - Build Supabase query:
-  - Filter by `animal_id` when `speciesId` provided
+  - Inner join `animals` and filter by `animals.species_id` when `species_id` provided
   - Filter `timestamp` between `start` and `end`
   - If `bbox` provided: numeric compare on `latitude/longitude` (PostGIS upgrade later)
 - Limit rows to 5,000 to keep map performant
@@ -187,7 +187,7 @@ Write a short spec covering all three endpoints. This is the contract that unblo
 - Accept same filter params as `/api/sightings`
 - Return:
   - `totalSightings` — total count for filter set
-  - `bySpecies` — `[{ animal_id, count }]`
+  - `byAnimal` — `[{ animal_id, count }]`
   - `byDay` or `byMonth` — grouped counts over time (for trend chart)
 
 **Dependencies:** Task 2.3 for query-building helpers; Task 1.2 for real data.
@@ -198,7 +198,7 @@ Write a short spec covering all three endpoints. This is the contract that unblo
 
 > **Owner: Person B** | `backend/src/index.ts`
 
-- Mount `animals`, `sightings`, and `insights` routers under `/api/`*
+- Mount `species`, `sightings`, and `insights` routers under `/api/`
 - Confirm `/health` endpoint works and is documented
 
 ---
@@ -247,7 +247,7 @@ Write a short spec covering all three endpoints. This is the contract that unblo
 > **Owner: Person D** | `frontend/src/components/AnimalSelector`
 
 - Text input with debounce
-- List/dropdown of species from `GET /api/animals?q=...`
+- List/dropdown of species from `GET /api/species?q=...`
 - Emits selected `animal_id` to parent state
 - Wire into `MapPage` via React state or context
 
@@ -288,7 +288,7 @@ Write a short spec covering all three endpoints. This is the contract that unblo
 
 > **Owner: Person E** (with B, C, D)
 
-- **Backend:** Unit tests for `/api/animals`, `/api/sightings`, `/api/insights` using a small test Supabase dataset or mocked Supabase client
+- **Backend:** Unit tests for `/api/species`, `/api/sightings`, `/api/insights` using a small test Supabase dataset or mocked Supabase client
 - **Frontend:** Component tests for `AnimalSelector` and map filter behavior (no full E2E needed for MVP)
 
 ---
@@ -327,7 +327,7 @@ Update root `README.md` to include:
 | Task | Description                                    | Size |
 | ---- | ---------------------------------------------- | ---- |
 | B1   | Write API contract doc (§2.1)                  | S    |
-| B2   | Implement `/api/animals` with search (§2.2)    | M    |
+| B2   | Implement `/api/species` with search (§2.2)    | M    |
 | B3   | Implement `/api/sightings` with filters (§2.3) | M–L  |
 | B4   | Implement `/api/insights` (§2.4)               | M    |
 | B5   | Add endpoint tests + README docs (§4.1–4.2)    | M    |
@@ -383,7 +383,7 @@ Update root `README.md` to include:
 ```
 A1 (schema)
   └─► A2 (pipeline)
-  └─► B2 (animals endpoint)
+  └─► B2 (species endpoint)
   └─► B3 (sightings endpoint)
         └─► B4 (insights endpoint)
               └─► D3 (insights UI)
