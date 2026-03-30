@@ -7,7 +7,7 @@ const router = Router()
 
 type InsightsPayload = {
   totalSightings: number
-  bySpecies: { animal_id: string; count: number }[]
+  byAnimal: { animal_id: string; count: number }[]
   byDay: { date: string; count: number }[]
 }
 
@@ -19,10 +19,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       return
     }
 
-    const { speciesId, bbox, start, end } = parsed
+    const { species_id, bbox, start, end } = parsed
 
     const { data, error } = await supabase.rpc('api_insights', {
-      p_species_id: speciesId ?? null,
+      p_species_id: species_id ?? null,
       p_min_lng: bbox ? bbox[0] : null,
       p_min_lat: bbox ? bbox[1] : null,
       p_max_lng: bbox ? bbox[2] : null,

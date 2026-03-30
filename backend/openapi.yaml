@@ -5,17 +5,17 @@ info:
   description: >
     Manual OpenAPI spec for WildPath backend endpoints.
 
-    Species filter: `GET /api/animals` returns species rows; each response `id` is `species.id`.
-    Optional `speciesId` on `/api/sightings` and `/api/insights` restricts to animals with that
-    `species_id` (same UUID as `/api/animals` `id`). Omitting `speciesId` applies no species filter
+    Species filter: `GET /api/species` returns species rows; each response `id` is `species.id`.
+    Optional `species_id` on `/api/sightings` and `/api/insights` restricts to animals with that
+    `species_id` (same UUID as `/api/species` `id`). Omitting `species_id` applies no species filter
     (all species in bbox/time, subject to row limits)—not "only species that matched a search text."
-    Future work may add multi-species or search-scoped queries (e.g. `speciesIds`, a search token, or
+    Future work may add multi-species or search-scoped queries (e.g. `species_ids`, a search token, or
     taxonomy / `species_group`); see `backend/API.md` section "Future (not implemented)".
 servers:
   - url: http://localhost:3001
     description: Local development server
 paths:
-  /api/animals:
+  /api/species:
     get:
       summary: List species for the animal selector
       description: Returns species rows with optional text search and result limit.
@@ -87,14 +87,14 @@ paths:
         filtering by species, bounding box, time range, and row limit.
       parameters:
         - in: query
-          name: speciesId
+          name: species_id
           required: false
           schema:
             type: string
             format: uuid
           description: >
             Filter to animals of this species. Use the same UUID as the `id` field on a row from
-            `GET /api/animals`. Omit for all species (within bbox/time/limit).
+            `GET /api/species`. Omit for all species (within bbox/time/limit).
           example: 550e8400-e29b-41d4-a716-446655440000
         - in: query
           name: bbox
@@ -154,7 +154,7 @@ paths:
         "400":
           description: >
             Invalid query parameter. Returned when `limit` is not a positive integer,
-            `speciesId` is not a valid UUID, `bbox` is malformed or has inverted min/max,
+            `species_id` is not a valid UUID, `bbox` is malformed or has inverted min/max,
             or `start`/`end` are not parseable date-time strings.
           content:
             application/json:
@@ -166,7 +166,7 @@ paths:
                     error: limit must be a positive integer
                 invalidSpeciesId:
                   value:
-                    error: speciesId must be a valid UUID
+                    error: species_id must be a valid UUID
                 invalidBbox:
                   value:
                     error: "bbox must be four numbers: minLng,minLat,maxLng,maxLat"
@@ -188,17 +188,17 @@ paths:
     get:
       summary: Aggregated sighting statistics for current filters
       description: >
-        Returns counts aligned with the same filters as `/api/sightings` (`speciesId`, `bbox`, `start`, `end`).
+        Returns counts aligned with the same filters as `/api/sightings` (`species_id`, `bbox`, `start`, `end`).
         The `limit` query parameter is ignored if present (aggregates are not row-limited).
       parameters:
         - in: query
-          name: speciesId
+          name: species_id
           required: false
           schema:
             type: string
             format: uuid
           description: >
-            Same as `/api/sightings` `speciesId`: species UUID from `GET /api/animals` `id`.
+            Same as `/api/sightings` `species_id`: species UUID from `GET /api/species` `id`.
             Omit for all species (within bbox/time).
           example: 550e8400-e29b-41d4-a716-446655440000
         - in: query
@@ -234,7 +234,7 @@ paths:
                 $ref: "#/components/schemas/InsightsResponse"
               example:
                 totalSightings: 1250
-                bySpecies:
+                byAnimal:
                   - animal_id: "22222222-0000-0000-0000-000000000001"
                     count: 800
                   - animal_id: "22222222-0000-0000-0000-000000000002"
@@ -271,7 +271,7 @@ components:
         id:
           type: string
           format: uuid
-          description: Species primary key; pass as `speciesId` on map endpoints.
+          description: Species primary key; pass as `species_id` on map endpoints.
         common_name:
           type: string
         scientific_name:
@@ -309,16 +309,16 @@ components:
       type: object
       required:
         - totalSightings
-        - bySpecies
+        - byAnimal
         - byDay
       properties:
         totalSightings:
           type: integer
           format: int64
           description: Total sightings matching the filter set.
-        bySpecies:
+        byAnimal:
           type: array
-          description: Per tracked animal (`animals.id`) counts, descending by count.
+          description: Per tracked individual (`animals.id`) counts, descending by count.
           items:
             $ref: "#/components/schemas/InsightsByAnimal"
         byDay:

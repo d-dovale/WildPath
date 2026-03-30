@@ -35,18 +35,18 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       res.status(parsedFilters.status).json(parsedFilters.body)
       return
     }
-    const { speciesId, bbox, start, end } = parsedFilters
+    const { species_id, bbox, start, end } = parsedFilters
 
     // Two select shapes keep Supabase TypeScript inference stable:
-    // - with speciesId: inner join animals for filtering
+    // - with species_id: inner join animals for filtering
     // - without: no join (avoids unnecessary work)
-    if (speciesId) {
+    if (species_id) {
       let query = supabase
         .from('sightings')
         .select('id, animal_id, latitude, longitude, timestamp, animals!inner(species_id)')
         .order('timestamp', { ascending: true })
         .limit(limit)
-        .eq('animals.species_id', speciesId)
+        .eq('animals.species_id', species_id)
 
       if (bbox) {
         const [minLng, minLat, maxLng, maxLat] = bbox

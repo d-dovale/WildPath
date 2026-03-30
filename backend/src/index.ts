@@ -5,7 +5,7 @@ import fs from 'fs'
 import path from 'path'
 import swaggerUi from 'swagger-ui-express'
 import yaml from 'js-yaml'
-import animalsRouter from './routes/animals'
+import speciesRouter from './routes/species'
 import sightingsRouter from './routes/sightings'
 import insightsRouter from './routes/insights'
 import { errorHandler } from './middleware/errorHandler'
@@ -35,7 +35,7 @@ if (ENABLE_SWAGGER_DOCS) {
   }
 }
 
-app.use('/api/animals', animalsRouter)
+app.use('/api/species', speciesRouter)
 app.use('/api/sightings', sightingsRouter)
 app.use('/api/insights', insightsRouter)
 

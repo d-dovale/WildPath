@@ -8,7 +8,7 @@ function isParseableDateTime(s: string): boolean {
 }
 
 export type SightingsFilters =
-  | { ok: true; speciesId?: string; bbox?: [number, number, number, number]; start?: string; end?: string }
+  | { ok: true; species_id?: string; bbox?: [number, number, number, number]; start?: string; end?: string }
   | { ok: false; status: 400; body: { error: string } }
 
 /**
@@ -16,13 +16,13 @@ export type SightingsFilters =
  * Does not parse `limit` (sightings-only).
  */
 export function parseSightingsFilters(query: Request['query']): SightingsFilters {
-  const speciesIdParam = query.speciesId
-  let speciesId: string | undefined
+  const speciesIdParam = query.species_id
+  let species_id: string | undefined
   if (speciesIdParam !== undefined) {
     if (typeof speciesIdParam !== 'string' || !UUID_RE.test(speciesIdParam.trim())) {
-      return { ok: false, status: 400, body: { error: 'speciesId must be a valid UUID' } }
+      return { ok: false, status: 400, body: { error: 'species_id must be a valid UUID' } }
     }
-    speciesId = speciesIdParam.trim()
+    species_id = speciesIdParam.trim()
   }
 
   const bboxParam = query.bbox
@@ -114,5 +114,5 @@ export function parseSightingsFilters(query: Request['query']): SightingsFilters
     end = trimmed
   }
 
-  return { ok: true, speciesId, bbox, start, end }
+  return { ok: true, species_id, bbox, start, end }
 }
