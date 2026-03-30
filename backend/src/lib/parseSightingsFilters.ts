@@ -72,7 +72,7 @@ export function parseSightingsFilters(query: Request['query']): SightingsFilters
       return {
         ok: false,
         status: 400,
-        body: { error: 'bbox must be four numbers: minLng,minLat,maxLng,maxLat' },
+        body: { error: 'bbox values must be within lon [-180,180] and lat [-90,90]' },
       }
     }
     if (parts[0] > parts[2] || parts[1] > parts[3]) {
