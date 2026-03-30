@@ -88,3 +88,5 @@ router.get('/locations', async (_req: Request, res: Response, next: NextFunction
     next(err)
   }
 })
+
+export default router;
