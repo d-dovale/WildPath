@@ -75,4 +75,18 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 })
 
-export default router
+router.get('/locations', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { data, error } = await supabase
+      .from('sightings')
+      .select('id, latitude, longitude, timestamp, animal_id')
+      .limit(100)
+
+    if (error) throw error
+    res.json(data)
+  } catch (err) {
+    next(err)
+  }
+})
+
+export default router;
