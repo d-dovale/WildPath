@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import Navbar from '../components/ui/navbar'
+import AnimalSelector from '../components/AnimalSelector'
 
 import { useQuery } from '@tanstack/react-query'
 
@@ -28,7 +29,7 @@ export default function MapPage() {
 
   // Optional filters — omit time range by default so dev seed data (e.g. 2024) is not excluded by
   // a rolling "last 30 days" window. Pass `start`/`end` when the filters UI supplies them.
-  const [speciesId] = useState<string | null>(null)
+  const [speciesId, setSpeciesId] = useState<string | null>(null)
   const [timeRange] = useState<{ start: string; end: string } | null>(null)
 
   const { data: sightings, isLoading } = useQuery<Sighting[]>({
@@ -118,6 +119,11 @@ export default function MapPage() {
             </h2>
             {/* Person D's components go here */}
             <div className="space-y-4">
+              <AnimalSelector
+                selectedSpeciesId={speciesId}
+                onSelect={setSpeciesId}
+              />
+
               <div className="text-sm font-medium">
                 {isLoading ? (
                   <span className="flex items-center gap-2 text-blue-500 animate-pulse">
