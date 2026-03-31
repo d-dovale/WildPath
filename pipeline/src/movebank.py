@@ -59,7 +59,11 @@ def _request(params: dict, timeout: int = 300) -> pd.DataFrame:
     if not text:
         return pd.DataFrame()
 
-    return pd.read_csv(StringIO(text))
+    try:
+        return pd.read_csv(StringIO(text))
+    except Exception:
+        logger.warning("Could not parse response as CSV; skipping. First 200 chars: %s", text[:200])
+        return pd.DataFrame()
 
 
 def get_gps_studies() -> pd.DataFrame:
