@@ -154,6 +154,8 @@ python src/ingest.py
 | `SUPABASE_URL`         | Your Supabase project URL                |
 | `SUPABASE_SERVICE_KEY` | Supabase service role key (keep secret!) |
 | `FRONTEND_ORIGIN`      | Frontend URL for CORS (e.g. `http://localhost:5173`) |
+| `API_NINJAS_API_KEY`   | API Ninjas key used to enrich species facts |
+| `PEXELS_API_KEY`       | Pexels API key used to fetch species photos |
 
 ### `pipeline/.env`
 

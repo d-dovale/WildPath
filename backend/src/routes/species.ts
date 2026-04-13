@@ -1,12 +1,19 @@
 import { Router } from 'express'
 import type { Request, Response, NextFunction } from 'express'
+import { fetchAnimalInfo } from '../lib/fetchAnimalInfo'
+import { fetchSpeciesPhoto } from '../lib/fetchSpeciesPhoto'
+import { isUuid } from '../lib/isUuid'
+import { getSpeciesDetailsFromCache, setSpeciesDetailsInCache } from '../lib/speciesDetailsCache'
 import { supabase } from '../lib/supabase'
+import type { SpeciesDetailsResponse, SpeciesDetailsSpeciesRow, SpeciesListItem } from '../types'
 
 const router = Router()
 
 const DEFAULT_LIMIT = 20
 const MAX_LIMIT = 50
 const MAX_SEARCH_LENGTH = 100
+const SPECIES_DETAIL_SELECT =
+  'id, common_name, scientific_name, description, conservation_status, habitat, fun_facts, population_estimate'
 
 // Characters with special meaning in PostgREST filter expressions.
 // Includes field/operator separator (.), quoting chars ('"'), and other syntax chars.
@@ -69,7 +76,76 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       return
     }
 
-    res.json(data ?? [])
+    res.json((data ?? []) as SpeciesListItem[])
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const rawSpeciesId = req.params.id
+    if (Array.isArray(rawSpeciesId)) {
+      res.status(400).json({ error: 'species id must be a valid UUID' })
+      return
+    }
+
+    const speciesId = rawSpeciesId?.trim()
+    if (!speciesId || !isUuid(speciesId)) {
+      res.status(400).json({ error: 'species id must be a valid UUID' })
+      return
+    }
+
+    const cached = getSpeciesDetailsFromCache(speciesId)
+    if (cached) {
+      res.json(cached)
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('species')
+      .select(SPECIES_DETAIL_SELECT)
+      .eq('id', speciesId)
+      .maybeSingle()
+
+    if (error) {
+      next(error)
+      return
+    }
+
+    if (!data) {
+      res.status(404).json({ error: 'Species not found' })
+      return
+    }
+
+    const species = data as SpeciesDetailsSpeciesRow
+    const [animalInfo, photo] = await Promise.all([
+      fetchAnimalInfo(species),
+      fetchSpeciesPhoto(species),
+    ])
+
+    const response: SpeciesDetailsResponse = {
+      ...species,
+      summary: {
+        conservation_status: {
+          value: species.conservation_status,
+          source: species.conservation_status ? 'wildpath_db' : null,
+        },
+        habitat: {
+          value: species.habitat ?? animalInfo?.characteristics.habitat ?? null,
+          source: species.habitat ? 'wildpath_db' : animalInfo?.characteristics.habitat ? 'api_ninjas' : null,
+        },
+        range: {
+          value: animalInfo && animalInfo.locations.length > 0 ? animalInfo.locations.join(', ') : null,
+          source: animalInfo && animalInfo.locations.length > 0 ? 'api_ninjas' : null,
+        },
+      },
+      animal_info: animalInfo,
+      photo,
+    }
+
+    setSpeciesDetailsInCache(speciesId, response)
+    res.json(response)
   } catch (err) {
     next(err)
   }
