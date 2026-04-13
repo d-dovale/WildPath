@@ -26,6 +26,7 @@ def extract_species(animals_df: pd.DataFrame) -> pd.DataFrame:
         .rename(columns={"taxon_canonical_name": "scientific_name"})
     )
 
+    species["scientific_name"] = species["scientific_name"].astype(str)
     species = species[species["scientific_name"].str.strip() != ""]
     species["common_name"] = species["scientific_name"]
 
@@ -43,11 +44,13 @@ def normalize_animals(animals_df: pd.DataFrame) -> pd.DataFrame:
 
     result = animals_df.dropna(subset=["id"]).copy()
 
-    result["movebank_id"] = result["id"].astype(int).astype(str)
+    result["movebank_id"] = result["id"].astype("int64").astype(str)
     result["name"] = result.get("local_identifier", pd.Series(dtype=str))
     result["taxon_canonical_name"] = result.get(
         "taxon_canonical_name", pd.Series(dtype=str)
     )
+    # Fill missing species with "Unknown" so animals still get ingested
+    result["taxon_canonical_name"] = result["taxon_canonical_name"].fillna("Unknown")
 
     return result[["movebank_id", "name", "taxon_canonical_name"]].reset_index(
         drop=True
@@ -94,7 +97,9 @@ def normalize_events(events_df: pd.DataFrame) -> pd.DataFrame:
         "location_long": "longitude",
     })
 
-    result["movebank_individual_id"] = result["movebank_individual_id"].astype(int).astype(str)
+    # Drop rows with missing individual IDs before casting
+    result = result.dropna(subset=["movebank_individual_id"])
+    result["movebank_individual_id"] = result["movebank_individual_id"].astype("int64").astype(str)
     result["timestamp"] = result["timestamp"].dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
     return (

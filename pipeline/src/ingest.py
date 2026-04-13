@@ -13,7 +13,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
-from movebank import get_gps_studies, get_study, get_animals, get_events
+from movebank import get_gps_studies, get_study, get_animals, get_events, get_taxon_name
 from transform import extract_species, normalize_animals, normalize_events
 
 load_dotenv()
@@ -116,6 +116,25 @@ def run(study_id: int) -> None:
         logger.warning("No animals found — skipping study %d", study_id)
         return
 
+    # Resolve study-level taxon as fallback for animals missing species
+    fallback_species = "Unknown"
+    taxon_ids_raw = str(study_meta.get("taxon_ids", "")).strip()
+    logger.info("Study taxon_ids: '%s'", taxon_ids_raw)
+    if taxon_ids_raw and taxon_ids_raw not in ("nan", "", "None"):
+        # taxon_ids can be comma-separated; take the first one
+        first_taxon_id = taxon_ids_raw.split(",")[0].strip()
+        if first_taxon_id:
+            resolved_name = get_taxon_name(first_taxon_id)
+            if resolved_name:
+                fallback_species = resolved_name
+                logger.info("Resolved study-level taxon: %s", fallback_species)
+
+    # Fill missing species names with study-level taxon or "Unknown"
+    if "taxon_canonical_name" in raw_animals.columns:
+        raw_animals["taxon_canonical_name"] = raw_animals["taxon_canonical_name"].fillna(fallback_species)
+    else:
+        raw_animals["taxon_canonical_name"] = fallback_species
+
     # 3. Extract and upsert species
     species_df = extract_species(raw_animals)
     if not species_df.empty:
@@ -215,10 +234,23 @@ if __name__ == "__main__":
         study_ids = studies_df["id"].astype(int).tolist()
         logger.info("Discovered %d GPS studies", len(study_ids))
 
-    for sid in study_ids:
+    succeeded = 0
+    failed = 0
+    skipped = 0
+
+    for i, sid in enumerate(study_ids, 1):
         try:
+            logger.info("=== Study %d / %d (ID: %d) ===", i, len(study_ids), sid)
             run(sid)
+            succeeded += 1
         except Exception:
             logger.exception("Failed to ingest study %d", sid)
+            failed += 1
 
-    logger.info("Pipeline complete.")
+    logger.info(
+        "Pipeline complete. Studies processed: %d succeeded, %d failed, %d total attempted out of %d discovered.",
+        succeeded,
+        failed,
+        succeeded + failed,
+        len(study_ids),
+    )
