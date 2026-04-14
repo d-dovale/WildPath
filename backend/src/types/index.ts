@@ -8,7 +8,7 @@ export interface SpeciesDetailsSpeciesRow extends SpeciesListItem {
   description: string | null
   conservation_status: string | null
   habitat: string | null
-  fun_facts: unknown
+  fun_facts: unknown | null
   population_estimate: string | null
 }
 

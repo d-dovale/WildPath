@@ -389,6 +389,14 @@ components:
           type: string
           nullable: true
         fun_facts:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items: {}
+            - type: string
+            - type: number
+            - type: boolean
           nullable: true
         population_estimate:
           type: string

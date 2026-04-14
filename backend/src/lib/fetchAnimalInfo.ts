@@ -1,4 +1,5 @@
 import axios from 'axios'
+import type { AxiosError } from 'axios'
 import type {
   SpeciesDetailsAnimalInfo,
   SpeciesDetailsCharacteristics,
@@ -106,6 +107,22 @@ function selectBestMatch(
   return results[0] ?? null
 }
 
+function logApiNinjasLookupFailure(query: string, error: unknown): void {
+  if (axios.isAxiosError(error)) {
+    const axiosError = error as AxiosError
+    console.warn(`[WildPath] WARNING: API Ninjas animal lookup failed for "${query}".`, {
+      message: axiosError.message,
+      status: axiosError.response?.status ?? null,
+      data: axiosError.response?.data ?? null,
+    })
+    return
+  }
+
+  console.warn(`[WildPath] WARNING: API Ninjas animal lookup failed for "${query}".`, {
+    message: error instanceof Error ? error.message : String(error),
+  })
+}
+
 async function searchAnimalInfo(
   query: string,
   apiKey: string,
@@ -119,7 +136,7 @@ async function searchAnimalInfo(
 
     return Array.isArray(data) ? data : []
   } catch (error) {
-    console.warn(`[WildPath] WARNING: API Ninjas animal lookup failed for "${query}".`, error)
+    logApiNinjasLookupFailure(query, error)
     return []
   }
 }

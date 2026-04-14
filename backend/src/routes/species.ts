@@ -3,7 +3,12 @@ import type { Request, Response, NextFunction } from 'express'
 import { fetchAnimalInfo } from '../lib/fetchAnimalInfo'
 import { fetchSpeciesPhoto } from '../lib/fetchSpeciesPhoto'
 import { isUuid } from '../lib/isUuid'
-import { getSpeciesDetailsFromCache, setSpeciesDetailsInCache } from '../lib/speciesDetailsCache'
+import {
+  FULL_SPECIES_DETAILS_TTL_MS,
+  getSpeciesDetailsFromCache,
+  PARTIAL_SPECIES_DETAILS_TTL_MS,
+  setSpeciesDetailsInCache,
+} from '../lib/speciesDetailsCache'
 import { supabase } from '../lib/supabase'
 import type { SpeciesDetailsResponse, SpeciesDetailsSpeciesRow, SpeciesListItem } from '../types'
 
@@ -85,12 +90,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const rawSpeciesId = req.params.id
-    if (Array.isArray(rawSpeciesId)) {
-      res.status(400).json({ error: 'species id must be a valid UUID' })
-      return
-    }
-
-    const speciesId = rawSpeciesId?.trim()
+    const speciesId = typeof rawSpeciesId === 'string' ? rawSpeciesId.trim() : undefined
     if (!speciesId || !isUuid(speciesId)) {
       res.status(400).json({ error: 'species id must be a valid UUID' })
       return
@@ -144,7 +144,12 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       photo,
     }
 
-    setSpeciesDetailsInCache(speciesId, response)
+    const enrichmentComplete = animalInfo !== null && photo !== null
+    setSpeciesDetailsInCache(
+      speciesId,
+      response,
+      enrichmentComplete ? FULL_SPECIES_DETAILS_TTL_MS : PARTIAL_SPECIES_DETAILS_TTL_MS,
+    )
     res.json(response)
   } catch (err) {
     next(err)

@@ -1,5 +1,8 @@
 import type { SpeciesDetailsResponse } from '../types'
 
+export const PARTIAL_SPECIES_DETAILS_TTL_MS = 5 * 60 * 1000
+export const FULL_SPECIES_DETAILS_TTL_MS = 60 * 60 * 1000
+
 const ONE_HOUR_MS = 60 * 60 * 1000
 
 type CacheEntry = {

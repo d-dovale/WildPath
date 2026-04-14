@@ -1,6 +1,5 @@
 import type { Request } from 'express'
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+import { isUuid } from './isUuid'
 
 function isParseableDateTime(s: string): boolean {
   const t = Date.parse(s)
@@ -19,7 +18,7 @@ export function parseSightingsFilters(query: Request['query']): SightingsFilters
   const speciesIdParam = query.species_id
   let species_id: string | undefined
   if (speciesIdParam !== undefined) {
-    if (typeof speciesIdParam !== 'string' || !UUID_RE.test(speciesIdParam.trim())) {
+    if (typeof speciesIdParam !== 'string' || !isUuid(speciesIdParam)) {
       return { ok: false, status: 400, body: { error: 'species_id must be a valid UUID' } }
     }
     species_id = speciesIdParam.trim()
