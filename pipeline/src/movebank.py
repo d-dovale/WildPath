@@ -3,6 +3,8 @@ MoveBank API client.
 Docs: https://github.com/movebank/movebank-api-doc
 """
 
+from __future__ import annotations
+
 import hashlib
 import logging
 import os
@@ -59,6 +61,26 @@ def _request(params: dict, timeout: int = 300) -> pd.DataFrame:
     if not text:
         return pd.DataFrame()
 
+    # Some studies return license HTML as a 200 response instead of 403.
+    # Detect this and attempt the md5 license-acceptance flow.
+    if text.startswith("<html>"):
+        license_md5 = hashlib.md5(text.encode("utf-8")).hexdigest()
+        logger.info("Accepting HTML license for params %s (md5: %s)", params, license_md5)
+
+        params_with_license = {**params, "license-md5": license_md5}
+        response = requests.get(
+            MOVEBANK_BASE_URL,
+            params=params_with_license,
+            auth=auth,
+            timeout=timeout,
+        )
+        response.raise_for_status()
+        time.sleep(REQUEST_DELAY_SECONDS)
+        text = response.text.strip()
+        if not text or text.startswith("<html>"):
+            logger.warning("Still got HTML after license accept; skipping. First 200 chars: %s", text[:200])
+            return pd.DataFrame()
+
     try:
         return pd.read_csv(StringIO(text))
     except Exception:
@@ -67,14 +89,16 @@ def _request(params: dict, timeout: int = 300) -> pd.DataFrame:
 
 
 def get_gps_studies() -> pd.DataFrame:
-    """Fetch all studies that use GPS sensors and are accessible to this account.
+    """Fetch GPS studies that this account can actually download.
 
     MoveBank sensor_type_id 653 = GPS.
+    i_have_download_access=true filters to studies with granted access.
     Returns DataFrame with columns: id, name, acknowledgements
     """
     df = _request({
         "entity_type": "study",
         "sensor_type_id": 653,
+        "i_have_download_access": "true",
         "attributes": "id,name,acknowledgements",
     })
 
@@ -87,11 +111,11 @@ def get_gps_studies() -> pd.DataFrame:
 
 
 def get_study(study_id: int) -> dict:
-    """Fetch study metadata. Returns dict with source_id, name, description."""
+    """Fetch study metadata. Returns dict with source_id, name, description, taxon_ids."""
     df = _request({
         "entity_type": "study",
         "study_id": study_id,
-        "attributes": "id,name,acknowledgements",
+        "attributes": "id,name,acknowledgements,taxon_ids",
     })
 
     if df.empty:
@@ -99,10 +123,28 @@ def get_study(study_id: int) -> dict:
 
     row = df.iloc[0]
     return {
-        "source_id": int(row["id"]),
+        "source_id": int(row["id"]),  # bigint in DB — safe for large MoveBank IDs
         "name": str(row.get("name", "")),
         "description": str(row.get("acknowledgements", "")),
+        "taxon_ids": str(row.get("taxon_ids", "")),
     }
+
+
+def get_taxon_name(taxon_id: str) -> str | None:
+    """Look up the canonical name for a MoveBank taxon ID."""
+    df = _request({
+        "entity_type": "taxon",
+        "taxon_id": taxon_id,
+        "attributes": "id,canonical_name",
+    })
+
+    if df.empty:
+        return None
+
+    name = df.iloc[0].get("canonical_name")
+    if pd.isna(name):
+        return None
+    return str(name)
 
 
 def get_animals(study_id: int) -> pd.DataFrame:
