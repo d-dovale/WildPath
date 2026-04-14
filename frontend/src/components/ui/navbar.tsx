@@ -1,15 +1,25 @@
-import { Search, Bell, Settings, Compass, Map as MapIcon, Leaf, Info } from 'lucide-react';
-import * as React from 'react';
+import { Search, Bell, Settings, Compass, Map as MapIcon, Leaf, Info } from 'lucide-react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import * as React from 'react'
 
-export default function Navbar() {
+interface NavbarProps {
+  activePage?: string
+}
+
+export default function Navbar({ activePage }: NavbarProps) {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  const currentPage = activePage ?? (location.pathname === '/quiz' ? 'quiz' : 'explore')
+
   return (
     <header className="h-14 border-b bg-background px-4 flex items-center justify-between z-20 sticky top-0">
       {/* Left: Brand & Search */}
       <div className="flex items-center gap-6 flex-1">
-        <div className="flex items-center gap-2">
+        <button onClick={() => navigate('/')} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
           <Leaf className="w-5 h-5 text-green-600" />
           <span className="font-bold text-lg tracking-tight">WildPath</span>
-        </div>
+        </button>
 
         <div className="relative max-w-md w-full hidden md:block">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -22,12 +32,27 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Middle: Main Nav Buttons */}
+      {/* Middle: Main Nav */}
       <nav className="flex items-center gap-1 mx-4">
-        <NavButton icon={<MapIcon className="w-4 h-4" />} label="Explore" active />
-        <NavButton icon={<Compass className="w-4 h-4" />} label="Tracking" />
-        <NavButton icon={<Leaf className="w-4 h-4" />} label="Species" />
-        <NavButton icon={<Info className="w-4 h-4" />} label="About" />
+        <NavButton
+          icon={<MapIcon className="w-4 h-4" />}
+          label="Explore"
+          active={currentPage === 'explore'}
+          onClick={() => navigate('/')}
+        />
+        <NavButton
+          icon={<Compass className="w-4 h-4" />}
+          label="Tracking"
+          active={false}
+          onClick={() => {}}
+        />
+        <NavButton
+          icon={<Leaf className="w-4 h-4" />}
+          label="Quiz"
+          active={currentPage === 'quiz'}
+          onClick={() => navigate('/quiz')}
+        />
+        <NavButton icon={<Info className="w-4 h-4" />} label="About" active={false} onClick={() => {}} />
       </nav>
 
       {/* Right: User Controls */}
@@ -39,23 +64,36 @@ export default function Navbar() {
           <Settings className="w-5 h-5 text-muted-foreground" />
         </button>
         <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-green-400 to-blue-500 flex items-center justify-center text-white font-medium text-xs ml-1 cursor-pointer">
-            Placeholder
+          WP
         </div>
       </div>
     </header>
-  );
+  )
 }
 
-function NavButton({ icon, label, active = false }: { icon: React.ReactNode, label: string, active?: boolean }) {
+function NavButton({
+  icon,
+  label,
+  active,
+  onClick,
+}: {
+  icon: React.ReactNode
+  label: string
+  active: boolean
+  onClick: () => void
+}) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-        active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+        active
+          ? 'bg-primary/10 text-primary'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
       }`}
     >
       {icon}
       <span className="hidden lg:inline">{label}</span>
     </button>
-  );
+  )
 }

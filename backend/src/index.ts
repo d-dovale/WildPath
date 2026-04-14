@@ -8,6 +8,7 @@ import yaml from 'js-yaml'
 import speciesRouter from './routes/species'
 import sightingsRouter from './routes/sightings'
 import insightsRouter from './routes/insights'
+import quizRouter from './routes/quiz'
 import { errorHandler } from './middleware/errorHandler'
 
 const app = express()
@@ -38,6 +39,7 @@ if (ENABLE_SWAGGER_DOCS) {
 app.use('/api/species', speciesRouter)
 app.use('/api/sightings', sightingsRouter)
 app.use('/api/insights', insightsRouter)
+app.use('/api/quiz', quizRouter)
 
 app.use(errorHandler)
 
