@@ -8,4 +8,7 @@ export interface Sighting {
   species_id: string | null;
   common_name: string | null;
   scientific_name: string | null;
+  source?: "movebank" | "gbif";
+  country?: string | null;
+  basisOfRecord?: string | null;
 }
