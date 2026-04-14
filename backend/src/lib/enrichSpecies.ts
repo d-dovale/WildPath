@@ -1,13 +1,13 @@
 import { supabase } from "./supabase";
 
-interface INatTaxon {
+export interface INatTaxon {
   default_photo?: { medium_url?: string };
   conservation_status?: { status_name?: string };
   wikipedia_url?: string;
   preferred_common_name?: string;
 }
 
-interface WikiSummary {
+export interface WikiSummary {
   extract?: string;
   thumbnail?: { source?: string };
 }
@@ -22,7 +22,7 @@ interface EnrichedFields {
   wikipedia_url?: string;
 }
 
-async function fetchINaturalist(
+export async function fetchINaturalist(
   scientificName: string,
 ): Promise<INatTaxon | null> {
   try {
@@ -36,7 +36,9 @@ async function fetchINaturalist(
   }
 }
 
-async function fetchWikipedia(title: string): Promise<WikiSummary | null> {
+export async function fetchWikipedia(
+  title: string,
+): Promise<WikiSummary | null> {
   try {
     const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
     const res = await fetch(url, {

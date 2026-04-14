@@ -1,16 +1,28 @@
-import { Search, Bell, Settings, Compass, Map as MapIcon, Leaf, Info } from 'lucide-react'
-import { useNavigate, useLocation } from 'react-router-dom'
-import * as React from 'react'
+import {
+  Search,
+  Bell,
+  Settings,
+  Compass,
+  Map as MapIcon,
+  Leaf,
+  Info,
+} from "lucide-react";
+import { useNavigate, useLocation } from "react-router-dom";
+import * as React from "react";
 
 interface NavbarProps {
-  activePage?: string
+  activePage?: string;
+  hideSearch?: boolean;
 }
 
-export default function Navbar({ activePage }: NavbarProps) {
-  const navigate = useNavigate()
-  const location = useLocation()
-
-  const currentPage = activePage ?? (location.pathname === '/quiz' ? 'quiz' : 'explore')
+export default function Navbar({
+  activePage,
+  hideSearch = false,
+}: NavbarProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentPage =
+    activePage ?? (location.pathname === "/quiz" ? "quiz" : "explore");
 
   return (
     <header className="h-14 border-b bg-background px-4 flex items-center justify-between z-20 sticky top-0">
@@ -21,15 +33,17 @@ export default function Navbar({ activePage }: NavbarProps) {
           <span className="font-bold text-lg tracking-tight">WildPath</span>
         </button>
 
-        <div className="relative max-w-md w-full hidden md:block">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <input
-            type="search"
-            placeholder="Search wildlife or regions..."
-            aria-label="Search wildlife or regions"
-            className="w-full bg-muted/50 border rounded-md py-1.5 pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-        </div>
+        {!hideSearch && (
+          <div className="relative max-w-md w-full hidden md:block">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <input
+              type="search"
+              placeholder="Search wildlife or regions..."
+              aria-label="Search wildlife or regions"
+              className="w-full bg-muted/50 border rounded-md py-1.5 pl-9 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>
+        )}
       </div>
 
       {/* Middle: Main Nav */}
@@ -37,22 +51,25 @@ export default function Navbar({ activePage }: NavbarProps) {
         <NavButton
           icon={<MapIcon className="w-4 h-4" />}
           label="Explore"
-          active={currentPage === 'explore'}
-          onClick={() => navigate('/')}
+          active={currentPage === "explore"}
+          onClick={() => navigate("/")}
         />
         <NavButton
           icon={<Compass className="w-4 h-4" />}
           label="Tracking"
-          active={false}
           onClick={() => {}}
         />
         <NavButton
           icon={<Leaf className="w-4 h-4" />}
           label="Quiz"
-          active={currentPage === 'quiz'}
-          onClick={() => navigate('/quiz')}
+          active={currentPage === "quiz"}
+          onClick={() => navigate("/quiz")}
         />
-        <NavButton icon={<Info className="w-4 h-4" />} label="About" active={false} onClick={() => {}} />
+        <NavButton
+          icon={<Info className="w-4 h-4" />}
+          label="About"
+          onClick={() => {}}
+        />
       </nav>
 
       {/* Right: User Controls */}
@@ -68,19 +85,19 @@ export default function Navbar({ activePage }: NavbarProps) {
         </div>
       </div>
     </header>
-  )
+  );
 }
 
 function NavButton({
   icon,
   label,
-  active,
+  active = false,
   onClick,
 }: {
-  icon: React.ReactNode
-  label: string
-  active: boolean
-  onClick: () => void
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+  onClick: () => void;
 }) {
   return (
     <button
@@ -88,12 +105,12 @@ function NavButton({
       onClick={onClick}
       className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
         active
-          ? 'bg-primary/10 text-primary'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          ? "bg-primary/10 text-primary"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
       }`}
     >
       {icon}
       <span className="hidden lg:inline">{label}</span>
     </button>
-  )
+  );
 }
