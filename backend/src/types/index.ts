@@ -60,6 +60,9 @@ export interface SpeciesDetailsPhoto {
 }
 
 export interface SpeciesDetailsResponse extends SpeciesDetailsSpeciesRow {
+  range: string | null
+  image_url: string | null
+  wikipedia_url: string | null
   summary: SpeciesDetailsSummary
   animal_info: SpeciesDetailsAnimalInfo | null
   photo: SpeciesDetailsPhoto | null

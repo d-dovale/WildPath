@@ -126,6 +126,9 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 
     const response: SpeciesDetailsResponse = {
       ...species,
+      range: animalInfo && animalInfo.locations.length > 0 ? animalInfo.locations.join(', ') : null,
+      image_url: photo?.image_url ?? null,
+      wikipedia_url: null,
       summary: {
         conservation_status: {
           value: species.conservation_status,

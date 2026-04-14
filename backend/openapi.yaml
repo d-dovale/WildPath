@@ -401,6 +401,17 @@ components:
         population_estimate:
           type: string
           nullable: true
+        range:
+          type: string
+          nullable: true
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        wikipedia_url:
+          type: string
+          format: uri
+          nullable: true
         summary:
           $ref: "#/components/schemas/SpeciesDetailsSummary"
         animal_info:
