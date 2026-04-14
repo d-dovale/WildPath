@@ -30,7 +30,6 @@ function sanitizeSearchTerm(raw: string): string {
 
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // --- limit validation ---
     const limitParam = req.query.limit
     let limit = DEFAULT_LIMIT
     if (limitParam !== undefined) {
@@ -50,7 +49,6 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       limit = Math.min(parsed, MAX_LIMIT)
     }
 
-    // --- search term sanitization ---
     const qParam = req.query.q
     let q: string | undefined
     if (qParam !== undefined) {
@@ -124,9 +122,12 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       fetchSpeciesPhoto(species),
     ])
 
+    const normalizedRange =
+      animalInfo && animalInfo.locations.length > 0 ? animalInfo.locations.join(', ') : null
+
     const response: SpeciesDetailsResponse = {
       ...species,
-      range: animalInfo && animalInfo.locations.length > 0 ? animalInfo.locations.join(', ') : null,
+      range: normalizedRange,
       image_url: photo?.image_url ?? null,
       wikipedia_url: null,
       summary: {
@@ -139,8 +140,8 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
           source: species.habitat ? 'wildpath_db' : animalInfo?.characteristics.habitat ? 'api_ninjas' : null,
         },
         range: {
-          value: animalInfo && animalInfo.locations.length > 0 ? animalInfo.locations.join(', ') : null,
-          source: animalInfo && animalInfo.locations.length > 0 ? 'api_ninjas' : null,
+          value: normalizedRange,
+          source: normalizedRange ? 'api_ninjas' : null,
         },
       },
       animal_info: animalInfo,
