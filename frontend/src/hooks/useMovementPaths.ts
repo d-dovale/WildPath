@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import type mapboxgl from 'mapbox-gl'
+import type { Map as MapboxMap } from 'mapbox-gl'
 import type { Sighting } from '@/types/sighting'
 
 const SOURCE_ID = 'movement-paths'
@@ -45,14 +45,14 @@ function buildGeoJSON(sightings: Sighting[]): GeoJSON.FeatureCollection {
   return { type: 'FeatureCollection', features }
 }
 
-function cleanupLayers(map: mapboxgl.Map) {
+function cleanupLayers(map: MapboxMap) {
   if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID)
   if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID)
 }
 
 interface Options {
   sightings: Sighting[] | undefined
-  map: mapboxgl.Map | null
+  map: MapboxMap | null
   enabled: boolean
   mapReady: boolean
 }
