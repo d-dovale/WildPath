@@ -6,11 +6,13 @@ interface GbifSearchReturn {
   results: GbifSearchResult[];
   bestMatch: GbifSearchResult | null;
   isLoading: boolean;
+  isDebouncing: boolean;
   error: Error | null;
 }
 
 export function useGbifSearch(query: string): GbifSearchReturn {
-  const debouncedQuery = useDebounce(query.trim(), 400);
+  const trimmedQuery = query.trim();
+  const debouncedQuery = useDebounce(trimmedQuery, 400);
 
   const { data, isLoading, error } = useQuery<{ results: GbifSearchResult[] }>(
     {
@@ -27,8 +29,16 @@ export function useGbifSearch(query: string): GbifSearchReturn {
     },
   );
 
-  const results = data?.results ?? [];
+  const isDebouncing =
+    trimmedQuery.length >= 2 && debouncedQuery !== trimmedQuery;
+  const results = isDebouncing ? [] : (data?.results ?? []);
   const bestMatch = results.length > 0 ? results[0] : null;
 
-  return { results, bestMatch, isLoading, error: error as Error | null };
+  return {
+    results,
+    bestMatch,
+    isLoading: isDebouncing || isLoading,
+    isDebouncing,
+    error: error as Error | null,
+  };
 }
