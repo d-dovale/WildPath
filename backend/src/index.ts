@@ -14,10 +14,27 @@ import { errorHandler } from "./middleware/errorHandler";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
-const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN ?? "http://localhost:5173";
+const FRONTEND_ORIGIN = normalizeOrigin(
+  process.env.FRONTEND_ORIGIN ?? "http://localhost:5173",
+);
 const ENABLE_SWAGGER_DOCS = process.env.ENABLE_SWAGGER_DOCS === "true";
 
-app.use(cors({ origin: FRONTEND_ORIGIN }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || normalizeOrigin(origin) === FRONTEND_ORIGIN) {
+        callback(null, true);
+        return;
+      }
+
+      callback(
+        new Error(
+          `CORS blocked request from origin "${origin}". Allowed origin: "${FRONTEND_ORIGIN}"`,
+        ),
+      );
+    },
+  }),
+);
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
@@ -55,3 +72,7 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`WildPath API running on http://localhost:${PORT}`);
 });
+
+function normalizeOrigin(value: string): string {
+  return value.trim().replace(/\/+$/, "");
+}
