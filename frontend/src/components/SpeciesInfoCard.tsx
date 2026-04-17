@@ -33,18 +33,19 @@ export default function SpeciesInfoCard({ speciesId }: Props) {
   if (error || !species) return null
 
   const infoRows = [
-    { label: 'Conservation Status', value: species.conservation_status },
-    { label: 'Habitat', value: species.habitat },
-    { label: 'Range', value: species.range },
-    { label: 'Population', value: species.population_estimate },
+    { label: 'Conservation Status', value: species.summary.conservation_status.value },
+    { label: 'Habitat', value: species.summary.habitat.value },
+    { label: 'Range', value: species.summary.range.value },
   ].filter((row) => row.value)
+
+  const imageUrl = species.photo?.image_url ?? species.image_url
 
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
-      {species.image_url && (
+      {imageUrl && (
         <img
-          src={species.image_url}
-          alt={species.common_name}
+          src={imageUrl}
+          alt={species.photo?.alt ?? species.common_name}
           className="w-full h-40 object-cover"
         />
       )}
@@ -57,12 +58,6 @@ export default function SpeciesInfoCard({ speciesId }: Props) {
           {species.scientific_name}
         </p>
 
-        {species.description && (
-          <p className="text-xs text-muted-foreground mb-3 line-clamp-3">
-            {species.description}
-          </p>
-        )}
-
         {infoRows.length > 0 && (
           <dl className="space-y-1.5">
             {infoRows.map((row) => (
@@ -72,20 +67,6 @@ export default function SpeciesInfoCard({ speciesId }: Props) {
               </div>
             ))}
           </dl>
-        )}
-
-        {species.wikipedia_url && (
-          <div className="flex justify-between text-sm mt-1.5">
-            <span className="text-muted-foreground">Source</span>
-            <a
-              href={species.wikipedia_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-primary hover:underline"
-            >
-              Wikipedia
-            </a>
-          </div>
         )}
       </div>
     </div>

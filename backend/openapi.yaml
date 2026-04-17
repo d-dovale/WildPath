@@ -8,9 +8,7 @@ info:
     Species filter: `GET /api/species` returns species rows; each response `id` is `species.id`.
     Optional `species_id` on `/api/sightings` and `/api/insights` restricts to animals with that
     `species_id` (same UUID as `/api/species` `id`). Omitting `species_id` applies no species filter
-    (all species in bbox/time, subject to row limits)—not "only species that matched a search text."
-    Future work may add multi-species or search-scoped queries (e.g. `species_ids`, a search token, or
-    taxonomy / `species_group`); see `backend/API.md` section "Future (not implemented)".
+    (all species in bbox/time, subject to row limits), not "only species that matched a search text."
 servers:
   - url: http://localhost:3001
     description: Local development server
@@ -47,19 +45,15 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Species"
-              examples:
-                success:
-                  value:
-                    - id: 550e8400-e29b-41d4-a716-446655440000
-                      common_name: Gray Wolf
-                      scientific_name: Canis lupus
-                    - id: 6ba7b810-9dad-11d1-80b4-00c04fd430c8
-                      common_name: Red Wolf
-                      scientific_name: Canis rufus
+              example:
+                - id: 550e8400-e29b-41d4-a716-446655440000
+                  common_name: Gray Wolf
+                  scientific_name: Canis lupus
+                - id: 6ba7b810-9dad-11d1-80b4-00c04fd430c8
+                  common_name: Red Wolf
+                  scientific_name: Canis rufus
         "400":
-          description: >
-            Invalid query parameter. Returned when `limit` is not a positive
-            integer, or `q` is not a string.
+          description: Invalid query parameter.
           content:
             application/json:
               schema:
@@ -71,6 +65,97 @@ paths:
                 invalidQ:
                   value:
                     error: Invalid q parameter
+        "500":
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Internal Server Error
+  /api/species/{id}:
+    get:
+      summary: Fetch a species detail payload with enrichment
+      description: >
+        Returns one species row from WildPath plus normalized summary fields for the sidebar,
+        API Ninjas animal facts, and one primary Pexels photo. If a third-party provider fails,
+        the endpoint still returns the local species row with the missing enrichment fields set to null.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Species UUID from `GET /api/species`.
+          example: 550e8400-e29b-41d4-a716-446655440000
+      responses:
+        "200":
+          description: Species details returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SpeciesDetailsResponse"
+              example:
+                id: 550e8400-e29b-41d4-a716-446655440000
+                common_name: Bald Eagle
+                scientific_name: Haliaeetus leucocephalus
+                description: null
+                conservation_status: Least Concern
+                habitat: Near water bodies
+                fun_facts: null
+                population_estimate: null
+                summary:
+                  conservation_status:
+                    value: Least Concern
+                    source: wildpath_db
+                  habitat:
+                    value: Near water bodies
+                    source: wildpath_db
+                  range:
+                    value: North America
+                    source: api_ninjas
+                animal_info:
+                  taxonomy:
+                    scientific_name: Haliaeetus leucocephalus
+                    class: Aves
+                    order: Accipitriformes
+                    family: Accipitridae
+                    genus: Haliaeetus
+                  locations:
+                    - North America
+                  characteristics:
+                    habitat: Near water bodies
+                    diet: Fish
+                    lifespan: 20 years
+                    weight: 3kg-6.3kg
+                    height: 70cm-102cm
+                    top_speed: 48km/h
+                    estimated_population_size: Unknown
+                    biggest_threat: Habitat loss
+                photo:
+                  image_url: https://images.pexels.com/photos/example/pexels-photo.jpeg
+                  alt: Bald eagle flying over forest
+                  photographer: Jane Doe
+                  photographer_url: https://www.pexels.com/@janedoe
+                  pexels_url: https://www.pexels.com/photo/example/
+                  source: pexels
+        "400":
+          description: Invalid species UUID.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: species id must be a valid UUID
+        "404":
+          description: Species UUID was valid but no matching row exists.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: Species not found
         "500":
           description: Internal server error.
           content:
@@ -152,10 +237,7 @@ paths:
                   longitude: -110.5
                   timestamp: "2024-01-05T08:00:00Z"
         "400":
-          description: >
-            Invalid query parameter. Returned when `limit` is not a positive integer,
-            `species_id` is not a valid UUID, `bbox` is malformed or has inverted min/max,
-            or `start`/`end` are not parseable date-time strings.
+          description: Invalid query parameter.
           content:
             application/json:
               schema:
@@ -206,8 +288,7 @@ paths:
           required: false
           schema:
             type: string
-          description: >
-            Bounding box as `minLng,minLat,maxLng,maxLat`. Same rules as `/api/sightings`.
+          description: Bounding box as `minLng,minLat,maxLng,maxLat`. Same rules as `/api/sightings`.
           example: "-125,45,-110,50"
         - in: query
           name: start
@@ -235,9 +316,9 @@ paths:
               example:
                 totalSightings: 1250
                 byAnimal:
-                  - animal_id: "22222222-0000-0000-0000-000000000001"
+                  - animal_id: 22222222-0000-0000-0000-000000000001
                     count: 800
-                  - animal_id: "22222222-0000-0000-0000-000000000002"
+                  - animal_id: 22222222-0000-0000-0000-000000000002
                     count: 450
                 byDay:
                   - date: "2024-01-15"
@@ -245,7 +326,7 @@ paths:
                   - date: "2024-01-16"
                     count: 38
         "400":
-          description: Invalid query parameter (same validation as `/api/sightings` filters).
+          description: Invalid query parameter.
           content:
             application/json:
               schema:
@@ -276,6 +357,203 @@ components:
           type: string
         scientific_name:
           type: string
+    SpeciesDetailsResponse:
+      type: object
+      required:
+        - id
+        - common_name
+        - scientific_name
+        - description
+        - conservation_status
+        - habitat
+        - fun_facts
+        - population_estimate
+        - summary
+        - animal_info
+        - photo
+      properties:
+        id:
+          type: string
+          format: uuid
+        common_name:
+          type: string
+        scientific_name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        conservation_status:
+          type: string
+          nullable: true
+        habitat:
+          type: string
+          nullable: true
+        fun_facts:
+          oneOf:
+            - type: object
+              additionalProperties: true
+            - type: array
+              items: {}
+            - type: string
+            - type: number
+            - type: boolean
+          nullable: true
+        population_estimate:
+          type: string
+          nullable: true
+        range:
+          type: string
+          nullable: true
+        image_url:
+          type: string
+          format: uri
+          nullable: true
+        wikipedia_url:
+          type: string
+          format: uri
+          nullable: true
+        summary:
+          $ref: "#/components/schemas/SpeciesDetailsSummary"
+        animal_info:
+          allOf:
+            - $ref: "#/components/schemas/SpeciesDetailsAnimalInfo"
+          nullable: true
+        photo:
+          allOf:
+            - $ref: "#/components/schemas/SpeciesDetailsPhoto"
+          nullable: true
+    SpeciesDetailsSummary:
+      type: object
+      required:
+        - conservation_status
+        - habitat
+        - range
+      properties:
+        conservation_status:
+          $ref: "#/components/schemas/SpeciesSummaryField"
+        habitat:
+          $ref: "#/components/schemas/SpeciesSummaryField"
+        range:
+          $ref: "#/components/schemas/SpeciesSummaryField"
+    SpeciesSummaryField:
+      type: object
+      required:
+        - value
+        - source
+      properties:
+        value:
+          type: string
+          nullable: true
+        source:
+          type: string
+          nullable: true
+          enum:
+            - wildpath_db
+            - api_ninjas
+            - pexels
+    SpeciesDetailsAnimalInfo:
+      type: object
+      required:
+        - taxonomy
+        - locations
+        - characteristics
+      properties:
+        taxonomy:
+          $ref: "#/components/schemas/SpeciesDetailsTaxonomy"
+        locations:
+          type: array
+          items:
+            type: string
+        characteristics:
+          $ref: "#/components/schemas/SpeciesDetailsCharacteristics"
+    SpeciesDetailsTaxonomy:
+      type: object
+      required:
+        - scientific_name
+        - class
+        - order
+        - family
+        - genus
+      properties:
+        scientific_name:
+          type: string
+          nullable: true
+        class:
+          type: string
+          nullable: true
+        order:
+          type: string
+          nullable: true
+        family:
+          type: string
+          nullable: true
+        genus:
+          type: string
+          nullable: true
+    SpeciesDetailsCharacteristics:
+      type: object
+      required:
+        - habitat
+        - diet
+        - lifespan
+        - weight
+        - height
+        - top_speed
+        - estimated_population_size
+        - biggest_threat
+      properties:
+        habitat:
+          type: string
+          nullable: true
+        diet:
+          type: string
+          nullable: true
+        lifespan:
+          type: string
+          nullable: true
+        weight:
+          type: string
+          nullable: true
+        height:
+          type: string
+          nullable: true
+        top_speed:
+          type: string
+          nullable: true
+        estimated_population_size:
+          type: string
+          nullable: true
+        biggest_threat:
+          type: string
+          nullable: true
+    SpeciesDetailsPhoto:
+      type: object
+      required:
+        - image_url
+        - alt
+        - photographer
+        - photographer_url
+        - pexels_url
+        - source
+      properties:
+        image_url:
+          type: string
+          format: uri
+        alt:
+          type: string
+          nullable: true
+        photographer:
+          type: string
+        photographer_url:
+          type: string
+          format: uri
+        pexels_url:
+          type: string
+          format: uri
+        source:
+          type: string
+          enum:
+            - pexels
     Sighting:
       type: object
       required:

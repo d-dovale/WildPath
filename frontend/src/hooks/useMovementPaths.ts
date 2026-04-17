@@ -16,7 +16,7 @@ function colorFromId(id: string): string {
 }
 
 function buildGeoJSON(sightings: Sighting[]): GeoJSON.FeatureCollection {
-  const groups = new Map<string, Sighting[]>()
+  const groups = new globalThis.Map<string, Sighting[]>()
   for (const s of sightings) {
     const group = groups.get(s.animal_id)
     if (group) {
