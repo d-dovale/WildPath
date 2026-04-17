@@ -77,6 +77,11 @@ export interface GbifSpeciesDetail {
   description?: string;
 }
 
+interface GbifSearchCandidate {
+  result: GbifSearchResult;
+  vernacularAliases: string[];
+}
+
 // ---------------------------------------------------------------------------
 // Species search — tries vernacular name search, then falls back to fuzzy match
 // ---------------------------------------------------------------------------
@@ -103,7 +108,7 @@ export async function searchSpecies(
 
   const searchResults = rankSearchResults(
     (searchRes.data.results ?? []).map((r: Record<string, unknown>) =>
-      mapSearchResult(r),
+      mapSearchCandidate(r),
     ),
     query,
   );
@@ -118,7 +123,7 @@ export async function searchSpecies(
   const match = matchRes.data;
   if (match.matchType === "NONE") return [];
 
-  return rankSearchResults([mapMatchResult(match)], query);
+  return rankSearchResults([mapMatchCandidate(match)], query);
 }
 
 // ---------------------------------------------------------------------------
@@ -224,55 +229,52 @@ export async function fetchSpeciesDetail(
 // Mappers (raw API → typed objects)
 // ---------------------------------------------------------------------------
 
-function mapSearchResult(r: Record<string, unknown>): GbifSearchResult {
-  // species/search returns `nubKey` as the backbone key
-  const key = (r.nubKey ?? r.key) as number;
-
-  // Extract first English vernacular name if available
-  const vernacularNames = r.vernacularNames as
-    | Array<{ vernacularName?: string; language?: string }>
-    | undefined;
-  const englishVernacular = vernacularNames?.find(
-    (v) => v.language === "eng" || v.language === "en",
-  );
+function mapSearchCandidate(r: Record<string, unknown>): GbifSearchCandidate {
+  const vernacularAliases = getEnglishVernacularAliases(r);
 
   return {
-    key,
-    backboneKey:
-      typeof r.nubKey === "number" ? (r.nubKey as number) : undefined,
-    scientificName: String(r.scientificName ?? ""),
-    canonicalName: r.canonicalName ? String(r.canonicalName) : undefined,
-    vernacularName:
-      englishVernacular?.vernacularName ??
-      (r.vernacularName ? String(r.vernacularName) : undefined),
-    rank: String(r.rank ?? ""),
-    status: r.taxonomicStatus ? String(r.taxonomicStatus) : undefined,
-    kingdom: r.kingdom ? String(r.kingdom) : undefined,
-    phylum: r.phylum ? String(r.phylum) : undefined,
-    class: r.class ? String(r.class) : undefined,
-    order: r.order ? String(r.order) : undefined,
-    family: r.family ? String(r.family) : undefined,
-    genus: r.genus ? String(r.genus) : undefined,
+    result: {
+      key: (r.nubKey ?? r.key) as number,
+      backboneKey:
+        typeof r.nubKey === "number" ? (r.nubKey as number) : undefined,
+      scientificName: String(r.scientificName ?? ""),
+      canonicalName: r.canonicalName ? String(r.canonicalName) : undefined,
+      vernacularName: vernacularAliases[0] ?? getFallbackVernacularName(r),
+      rank: String(r.rank ?? ""),
+      status: r.taxonomicStatus ? String(r.taxonomicStatus) : undefined,
+      kingdom: r.kingdom ? String(r.kingdom) : undefined,
+      phylum: r.phylum ? String(r.phylum) : undefined,
+      class: r.class ? String(r.class) : undefined,
+      order: r.order ? String(r.order) : undefined,
+      family: r.family ? String(r.family) : undefined,
+      genus: r.genus ? String(r.genus) : undefined,
+    },
+    vernacularAliases,
   };
 }
 
-function mapMatchResult(r: Record<string, unknown>): GbifSearchResult {
+function mapMatchCandidate(r: Record<string, unknown>): GbifSearchCandidate {
+  const fallbackVernacular = r.vernacularName ? String(r.vernacularName) : undefined;
+
   return {
-    key: r.usageKey as number,
-    backboneKey:
-      typeof r.usageKey === "number" ? (r.usageKey as number) : undefined,
-    scientificName: String(r.scientificName ?? ""),
-    canonicalName: r.canonicalName ? String(r.canonicalName) : undefined,
-    vernacularName: r.vernacularName ? String(r.vernacularName) : undefined,
-    rank: String(r.rank ?? ""),
-    confidence: r.confidence as number | undefined,
-    matchType: r.matchType ? String(r.matchType) : undefined,
-    kingdom: r.kingdom ? String(r.kingdom) : undefined,
-    phylum: r.phylum ? String(r.phylum) : undefined,
-    class: r.class ? String(r.class) : undefined,
-    order: r.order ? String(r.order) : undefined,
-    family: r.family ? String(r.family) : undefined,
-    genus: r.genus ? String(r.genus) : undefined,
+    result: {
+      key: r.usageKey as number,
+      backboneKey:
+        typeof r.usageKey === "number" ? (r.usageKey as number) : undefined,
+      scientificName: String(r.scientificName ?? ""),
+      canonicalName: r.canonicalName ? String(r.canonicalName) : undefined,
+      vernacularName: fallbackVernacular,
+      rank: String(r.rank ?? ""),
+      confidence: r.confidence as number | undefined,
+      matchType: r.matchType ? String(r.matchType) : undefined,
+      kingdom: r.kingdom ? String(r.kingdom) : undefined,
+      phylum: r.phylum ? String(r.phylum) : undefined,
+      class: r.class ? String(r.class) : undefined,
+      order: r.order ? String(r.order) : undefined,
+      family: r.family ? String(r.family) : undefined,
+      genus: r.genus ? String(r.genus) : undefined,
+    },
+    vernacularAliases: fallbackVernacular ? [fallbackVernacular] : [],
   };
 }
 
@@ -283,12 +285,68 @@ interface ScoredSearchResult {
   quality: number;
 }
 
+type SearchLabelSource = "vernacular" | "scientific" | "primary";
+
+interface LabelScore {
+  source: SearchLabelSource;
+  label: string;
+  tier: number;
+  score: number;
+}
+
+interface AnimalQueryIntentHint {
+  families: string[];
+  genera: string[];
+}
+
+const ANIMAL_QUERY_HINTS: Record<string, AnimalQueryIntentHint> = {
+  bear: {
+    families: ["ursidae"],
+    genera: ["ailuropoda", "helarctos", "melursus", "tremarctos", "ursus"],
+  },
+  deer: {
+    families: ["cervidae"],
+    genera: [
+      "alces",
+      "axis",
+      "blastocerus",
+      "capreolus",
+      "cervus",
+      "dama",
+      "hippocamelus",
+      "hydropotes",
+      "mazama",
+      "muntiacus",
+      "odocoileus",
+      "ozotoceros",
+      "pudu",
+      "rangifer",
+      "rusa",
+    ],
+  },
+  eagle: {
+    families: ["accipitridae"],
+    genera: [
+      "aquila",
+      "clanga",
+      "haliaeetus",
+      "hieraaetus",
+      "ichethyophaga",
+      "lophotriorchis",
+      "nisaetus",
+      "polemaetus",
+      "spilornis",
+      "spizaetus",
+    ],
+  },
+};
+
 function rankSearchResults(
-  results: GbifSearchResult[],
+  candidates: GbifSearchCandidate[],
   query: string,
 ): GbifSearchResult[] {
-  const scoredResults = results
-    .filter(isAnimalSuggestion)
+  const scoredResults = candidates
+    .filter((candidate) => isAnimalSuggestion(candidate.result))
     .map((result) => scoreSearchResult(result, query))
     .filter((entry) => entry.tier > 0);
 
@@ -296,14 +354,8 @@ function rankSearchResults(
     return [];
   }
 
-  const backboneResults = scoredResults.filter(
-    (entry) => entry.result.backboneKey !== undefined,
-  );
-  const preferredResults =
-    backboneResults.length > 0 ? backboneResults : scoredResults;
-
   const dedupedByKey = dedupeScoredResults(
-    preferredResults,
+    scoredResults,
     (entry) => String(entry.result.key),
   );
   const dedupedByScientificName = dedupeScoredResults(
@@ -313,8 +365,9 @@ function rankSearchResults(
 
   const sortedResults = dedupedByScientificName.sort(compareScoredResults);
   const maxTier = sortedResults[0]?.tier ?? 0;
+  const queryTokens = normalizeSearchText(query).split(" ").filter(Boolean);
 
-  if (maxTier === EXACT_TIER) {
+  if (maxTier === EXACT_TIER && queryTokens.length > 1) {
     return sortedResults.slice(0, 1).map((entry) => entry.result);
   }
 
@@ -368,54 +421,120 @@ function compareScoredResults(
 }
 
 function scoreSearchResult(
-  result: GbifSearchResult,
+  candidate: GbifSearchCandidate,
   query: string,
 ): ScoredSearchResult {
   const normalizedQuery = normalizeSearchText(query);
   const queryTokens = normalizedQuery.split(" ").filter(Boolean);
-  const vernacularLabel = normalizeSearchText(result.vernacularName);
-  const scientificLabel = normalizeSearchText(getScientificLabel(result));
-  const primaryLabel = normalizeSearchText(getPrimaryLabel(result));
-  const isSingleTokenQuery = queryTokens.length === 1;
+  const result = candidate.result;
+  const labelScores: LabelScore[] = [];
 
-  const vernacularTier = getMatchTier(vernacularLabel, normalizedQuery, queryTokens);
-  const scientificTier = getMatchTier(scientificLabel, normalizedQuery, queryTokens);
-  const primaryTier = getMatchTier(primaryLabel, normalizedQuery, queryTokens);
-  const tier = Math.max(vernacularTier, scientificTier, primaryTier);
-
-  let score = 0;
-  if (vernacularTier === EXACT_TIER) score = 400;
-  else if (scientificTier === EXACT_TIER) score = 360;
-  else if (primaryTier === EXACT_TIER) score = 340;
-  else if (vernacularTier === PREFIX_TIER) score = isSingleTokenQuery ? 210 : 300;
-  else if (scientificTier === PREFIX_TIER || primaryTier === PREFIX_TIER) {
-    score = isSingleTokenQuery ? 190 : 260;
-  }
-  else if (vernacularTier === TOKEN_TIER) score = 220;
-  else if (scientificTier === TOKEN_TIER || primaryTier === TOKEN_TIER) score = 200;
-  else if (vernacularTier === SUBSTRING_TIER) score = 140;
-  else if (
-    scientificTier === SUBSTRING_TIER ||
-    primaryTier === SUBSTRING_TIER
-  ) {
-    score = 120;
-  }
-
-  if (queryTokens.length === 1) {
-    const queryToken = queryTokens[0];
-    score += Math.max(
-      getSingleTokenBonus(vernacularLabel, queryToken),
-      getSingleTokenBonus(primaryLabel, queryToken),
-      getSingleTokenBonus(scientificLabel, queryToken),
+  for (const alias of candidate.vernacularAliases) {
+    const labelScore = scoreLabelMatch(
+      alias,
+      "vernacular",
+      normalizedQuery,
+      queryTokens,
+      result,
     );
+    if (labelScore) labelScores.push(labelScore);
   }
+
+  const scientificLabel = scoreLabelMatch(
+    getScientificLabel(result),
+    "scientific",
+    normalizedQuery,
+    queryTokens,
+    result,
+  );
+  if (scientificLabel) labelScores.push(scientificLabel);
+
+  const primaryLabel = scoreLabelMatch(
+    getPrimaryLabel(result),
+    "primary",
+    normalizedQuery,
+    queryTokens,
+    result,
+  );
+  if (primaryLabel) labelScores.push(primaryLabel);
+
+  const tier = labelScores.reduce(
+    (maxTier, entry) => Math.max(maxTier, entry.tier),
+    0,
+  );
+  const bestLabelScore = labelScores.sort(compareLabelScores)[0];
 
   return {
     result,
-    score,
+    score: bestLabelScore?.score ?? 0,
     tier,
     quality: getSearchResultQuality(result),
   };
+}
+
+function scoreLabelMatch(
+  rawLabel: string | undefined,
+  source: SearchLabelSource,
+  normalizedQuery: string,
+  queryTokens: string[],
+  result: GbifSearchResult,
+): LabelScore | null {
+  const label = normalizeSearchText(rawLabel);
+  const tier = getMatchTier(label, normalizedQuery, queryTokens);
+  if (tier === 0) {
+    return null;
+  }
+
+  const isBroadSingleTokenQuery = queryTokens.length === 1;
+  let score = getBaseScore(source, tier, isBroadSingleTokenQuery);
+
+  if (isBroadSingleTokenQuery) {
+    const queryToken = queryTokens[0];
+    score += getSingleTokenBonus(label, queryToken);
+    score += getBroadAnimalIntentAdjustment(label, queryToken, source, result);
+  }
+
+  return { source, label, tier, score };
+}
+
+function getBaseScore(
+  source: SearchLabelSource,
+  tier: number,
+  isBroadSingleTokenQuery: boolean,
+): number {
+  if (source === "vernacular") {
+    if (tier === EXACT_TIER) return 400;
+    if (tier === PREFIX_TIER) return isBroadSingleTokenQuery ? 210 : 300;
+    if (tier === TOKEN_TIER) return 220;
+    if (tier === SUBSTRING_TIER) return 140;
+    return 0;
+  }
+
+  if (source === "scientific") {
+    if (tier === EXACT_TIER) return 360;
+    if (tier === PREFIX_TIER) return isBroadSingleTokenQuery ? 190 : 260;
+    if (tier === TOKEN_TIER) return 200;
+    if (tier === SUBSTRING_TIER) return 120;
+    return 0;
+  }
+
+  if (tier === EXACT_TIER) return 340;
+  if (tier === PREFIX_TIER) return isBroadSingleTokenQuery ? 190 : 260;
+  if (tier === TOKEN_TIER) return 200;
+  if (tier === SUBSTRING_TIER) return 120;
+  return 0;
+}
+
+function compareLabelScores(left: LabelScore, right: LabelScore): number {
+  if (left.score !== right.score) {
+    return right.score - left.score;
+  }
+
+  if (left.tier !== right.tier) {
+    return right.tier - left.tier;
+  }
+
+  return left.label.length - right.label.length;
 }
 
 function getMatchTier(
@@ -478,6 +597,82 @@ function getSingleTokenBonus(label: string, queryToken: string): number {
   return labelTokens.length <= 2 ? 20 : 5;
 }
 
+function getBroadAnimalIntentAdjustment(
+  label: string,
+  queryToken: string,
+  source: SearchLabelSource,
+  result: GbifSearchResult,
+): number {
+  if (!label || !queryToken) {
+    return 0;
+  }
+
+  const labelTokens = label.split(" ").filter(Boolean);
+  const tokenIndex = labelTokens.indexOf(queryToken);
+  const hasExactLabelMatch = label === queryToken;
+  const taxonomyIntentStrength = getAnimalQueryIntentStrength(result, queryToken);
+  let score = 0;
+
+  if (hasExactLabelMatch) {
+    score += 40;
+  }
+
+  if (tokenIndex === labelTokens.length - 1 && labelTokens.length > 1) {
+    score += 70;
+  }
+
+  if (source !== "scientific" && tokenIndex === 0 && labelTokens.length > 1) {
+    score -= 85;
+  } else if (
+    source !== "scientific" &&
+    tokenIndex > 0 &&
+    tokenIndex < labelTokens.length - 1
+  ) {
+    score -= 45;
+  }
+
+  if (taxonomyIntentStrength === 2) {
+    score += 110;
+  } else if (taxonomyIntentStrength === 1) {
+    score += 60;
+  } else if (source !== "scientific" && tokenIndex === 0 && labelTokens.length > 1) {
+    score -= 25;
+  }
+
+  if (
+    hasExactLabelMatch &&
+    source !== "scientific" &&
+    taxonomyIntentStrength < 2
+  ) {
+    score -= 180;
+  }
+
+  return score;
+}
+
+function getAnimalQueryIntentStrength(
+  result: GbifSearchResult,
+  queryToken: string,
+): 0 | 1 | 2 {
+  const hint = ANIMAL_QUERY_HINTS[queryToken];
+  if (!hint) {
+    return 0;
+  }
+
+  const family = normalizeSearchText(result.family);
+  const genus = normalizeSearchText(result.genus);
+
+  if (hint.genera.includes(genus)) {
+    return 2;
+  }
+
+  if (hint.families.includes(family)) {
+    return 1;
+  }
+
+  return 0;
+}
+
 function getSearchResultQuality(result: GbifSearchResult): number {
   let quality = 0;
 
@@ -524,6 +719,46 @@ function normalizeSearchText(value: string | undefined): string {
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim()
     .replace(/\s+/g, " ") ?? "";
+}
+
+function getEnglishVernacularAliases(r: Record<string, unknown>): string[] {
+  const aliases = new Set<string>();
+  const unlabeledAliases = new Set<string>();
+  const vernacularNames = r.vernacularNames as
+    | Array<{ vernacularName?: string; language?: string }>
+    | undefined;
+
+  for (const entry of vernacularNames ?? []) {
+    const language = normalizeSearchText(entry.language);
+    const vernacularName = entry.vernacularName?.trim();
+    if (!vernacularName) {
+      continue;
+    }
+
+    if (language === "eng" || language === "en" || language === "english") {
+      aliases.add(vernacularName);
+      continue;
+    }
+
+    if (!language) {
+      unlabeledAliases.add(vernacularName);
+    }
+  }
+
+  const fallbackVernacular = getFallbackVernacularName(r);
+  if (fallbackVernacular) {
+    aliases.add(fallbackVernacular);
+  }
+
+  for (const alias of unlabeledAliases) {
+    aliases.add(alias);
+  }
+
+  return Array.from(aliases);
+}
+
+function getFallbackVernacularName(r: Record<string, unknown>): string | undefined {
+  return r.vernacularName ? String(r.vernacularName) : undefined;
 }
 
 function mapOccurrence(r: Record<string, unknown>): GbifOccurrence {

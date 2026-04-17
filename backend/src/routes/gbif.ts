@@ -149,31 +149,32 @@ const INAT_STATUS_TO_IUCN: Record<string, string> = {
   data_deficient: "DD",
 };
 
-async function enrichGbifDetail(
+export async function enrichGbifDetail(
   detail: GbifSpeciesDetail,
 ): Promise<GbifSpeciesDetail> {
   const scientificName = detail.canonicalName ?? detail.scientificName;
 
-  // Check if GBIF already has a photo
-  const gbifPhoto = detail.media.find(
-    (m) => m.type === "StillImage" && m.identifier,
-  );
-
   // Run iNaturalist + Wikipedia in parallel
   const [inat, wiki] = await Promise.all([
-    gbifPhoto && detail.iucnRedListCategory
-      ? Promise.resolve(null)
-      : fetchINaturalist(scientificName),
+    fetchINaturalist(scientificName),
     fetchWikipedia(scientificName.replace(/ /g, "_")),
   ]);
 
-  // Image: prefer GBIF photo, then iNaturalist, then Wikipedia thumbnail
-  if (gbifPhoto) {
-    detail = { ...detail, imageUrl: gbifPhoto.identifier };
-  } else if (inat?.default_photo?.medium_url) {
-    detail = { ...detail, imageUrl: inat.default_photo.medium_url };
-  } else if (wiki?.thumbnail?.source) {
-    detail = { ...detail, imageUrl: wiki.thumbnail.source };
+  const inatPhoto = inat?.default_photo?.medium_url;
+  const gbifPhoto = selectPreferredGbifPhoto(detail.media);
+  const gbifFallbackImage = selectFallbackGbifImage(detail.media);
+  const wikiThumbnail = wiki?.thumbnail?.source;
+  const preferredImage =
+    inatPhoto ||
+    gbifPhoto?.identifier ||
+    (wikiThumbnail && !isLikelyMapLikeImage(wikiThumbnail)
+      ? wikiThumbnail
+      : undefined) ||
+    gbifFallbackImage?.identifier ||
+    wikiThumbnail;
+
+  if (preferredImage) {
+    detail = { ...detail, imageUrl: preferredImage };
   }
 
   // Description from Wikipedia
@@ -199,6 +200,34 @@ function isAxios429(err: unknown): boolean {
     "response" in err &&
     (err as { response?: { status?: number } }).response?.status === 429
   );
+}
+
+function selectPreferredGbifPhoto(media: GbifSpeciesDetail["media"]) {
+  const gbifImages = media.filter(
+    (item) => item.type === "StillImage" && item.identifier,
+  );
+
+  return gbifImages.find((item) => !isLikelyMapLikeImage(getMediaSearchText(item)));
+}
+
+function selectFallbackGbifImage(media: GbifSpeciesDetail["media"]) {
+  return media.find((item) => item.type === "StillImage" && item.identifier);
+}
+
+function isLikelyMapLikeImage(value: string): boolean {
+  const normalized = value.toLowerCase();
+  return [
+    "chart",
+    "distribution",
+    "locator",
+    "map",
+    "range",
+    "svg",
+  ].some((token) => normalized.includes(token));
+}
+
+function getMediaSearchText(media: GbifSpeciesDetail["media"][number]): string {
+  return [media.identifier, media.title, media.creator].filter(Boolean).join(" ");
 }
 
 export default router;
