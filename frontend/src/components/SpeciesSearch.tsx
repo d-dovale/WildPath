@@ -49,9 +49,12 @@ export default function SpeciesSearch({
     [results],
   );
   const selectedLabel = selectedSpecies ? getPrimaryLabel(selectedSpecies) : "";
-  const hasSelectedSpecies = selectedSpecies !== null;
+  const clampedActiveIndex =
+    suggestions.length > 0
+      ? Math.min(activeIndex, suggestions.length - 1)
+      : 0;
   const isSelectedQuery =
-    hasSelectedSpecies &&
+    selectedSpecies !== null &&
     normalizeValue(trimmedQuery) === normalizeValue(selectedLabel);
 
   const clearSelection = () => {
@@ -118,9 +121,9 @@ export default function SpeciesSearch({
       return;
     }
 
-    if (event.key === "Enter" && isOpen) {
+    if (event.key === "Enter" && showDropdown) {
       event.preventDefault();
-      selectSuggestion(suggestions[activeIndex] ?? suggestions[0]);
+      selectSuggestion(suggestions[clampedActiveIndex]);
       return;
     }
 
@@ -184,16 +187,20 @@ export default function SpeciesSearch({
         )}
 
         {showDropdown && (
-          <div
-            id="species-search-suggestions"
-            role="listbox"
-            className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border bg-background shadow-md"
-          >
+          <>
             {isLoading ? (
-              <p className="px-3 py-2 text-xs text-blue-500 animate-pulse">
+              <div
+                role="status"
+                className="absolute z-20 mt-1 w-full rounded-md border bg-background px-3 py-2 text-xs text-blue-500 shadow-md animate-pulse"
+              >
                 Searching GBIF...
-              </p>
+              </div>
             ) : suggestions.length > 0 ? (
+              <div
+                id="species-search-suggestions"
+                role="listbox"
+                className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border bg-background shadow-md"
+              >
               <div className="max-h-72 overflow-y-auto py-1">
                 {suggestions.map((result, index) => {
                   const primaryLabel = getPrimaryLabel(result);
@@ -206,9 +213,11 @@ export default function SpeciesSearch({
                       key={result.key}
                       type="button"
                       role="option"
-                      aria-selected={index === activeIndex}
+                      aria-selected={index === clampedActiveIndex}
                       className={`flex w-full flex-col items-start gap-1 px-3 py-2 text-left transition-colors ${
-                        index === activeIndex ? "bg-muted" : "hover:bg-muted/70"
+                        index === clampedActiveIndex
+                          ? "bg-muted"
+                          : "hover:bg-muted/70"
                       }`}
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => selectSuggestion(result)}
@@ -228,12 +237,16 @@ export default function SpeciesSearch({
                   );
                 })}
               </div>
+              </div>
             ) : (
-              <p className="px-3 py-2 text-xs text-muted-foreground">
+              <div
+                role="status"
+                className="absolute z-20 mt-1 w-full rounded-md border bg-background px-3 py-2 text-xs text-muted-foreground shadow-md"
+              >
                 No species found. Try a different name.
-              </p>
+              </div>
             )}
-          </div>
+          </>
         )}
       </div>
 
@@ -244,7 +257,7 @@ export default function SpeciesSearch({
           </p>
         )}
 
-        {hasSelectedSpecies && (
+        {selectedSpecies && (
           <>
             <p className="flex items-center gap-1 text-xs text-green-600">
               <Check className="h-3 w-3 shrink-0" />
