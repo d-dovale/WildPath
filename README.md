@@ -143,7 +143,7 @@ python src/ingest.py
 
 | Variable           | Description                          |
 |--------------------|--------------------------------------|
-| `VITE_API_URL`     | URL of the Express backend (e.g. `http://localhost:3001`) |
+| `VITE_API_URL`     | Optional local backend override for development (e.g. `http://localhost:3001`). Production traffic should use frontend `/api/*` rewrites instead. |
 | `VITE_MAPBOX_TOKEN`| Your Mapbox public access token      |
 
 ### `backend/.env`
@@ -153,7 +153,7 @@ python src/ingest.py
 | `PORT`                 | Port for the Express server (default: `3001`) |
 | `SUPABASE_URL`         | Your Supabase project URL                |
 | `SUPABASE_SERVICE_KEY` | Supabase service role key (keep secret!) |
-| `FRONTEND_ORIGIN`      | Frontend URL for CORS (e.g. `http://localhost:5173`) |
+| `FRONTEND_ORIGIN`      | Exact frontend origin for CORS with no trailing slash (e.g. `http://localhost:5173` or `https://wild-path-frontend-navy.vercel.app`) |
 
 ### `pipeline/.env`
 
@@ -174,6 +174,18 @@ python src/ingest.py
   - `fix/...` for bug fixes (e.g. `fix/sightings-filter`)
   - `style/...` for non-functional changes (e.g. formatting, docs)
 - Open a PR into `main` when the branch is ready; get a review before merging.
+
+---
+
+## Vercel Deployment Notes
+
+- Frontend Vercel env:
+  - `VITE_MAPBOX_TOKEN`
+- Backend Vercel env:
+  - `FRONTEND_ORIGIN=https://wild-path-frontend-navy.vercel.app`
+  - plus the existing backend secrets such as `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`
+- The frontend Vercel project should keep `frontend/vercel.json` so browser requests to `/api/*` are rewritten to `https://wild-path-backend.vercel.app/api/*`.
+- `VITE_API_URL` is useful for local development, but it is not the primary production fix because most app requests already use relative `/api/*` paths.
 
 ---
 
