@@ -80,13 +80,17 @@ export interface GbifSpeciesDetail {
 interface GbifSearchCandidate {
   result: GbifSearchResult;
   vernacularAliases: string[];
+  source: "search" | "match";
 }
 
 // ---------------------------------------------------------------------------
 // Species search — tries vernacular name search, then falls back to fuzzy match
 // ---------------------------------------------------------------------------
 
-const SEARCH_RESULT_LIMIT = 100;
+const INITIAL_SEARCH_RESULT_LIMIT = 40;
+const EXPANDED_SEARCH_RESULT_LIMIT = 100;
+const FINAL_RESULT_LIMIT = 10;
+const MIN_ANIMAL_RESULTS_BEFORE_EXPAND = 6;
 const SUBSTRING_TIER = 1;
 const TOKEN_TIER = 2;
 const PREFIX_TIER = 3;
@@ -95,23 +99,47 @@ const EXACT_TIER = 4;
 export async function searchSpecies(
   query: string,
 ): Promise<GbifSearchResult[]> {
-  // 1. Search by vernacular (common) name
-  const searchRes = await client.get("/species/search", {
-    params: {
-      q: query,
-      qField: "VERNACULAR",
-      limit: SEARCH_RESULT_LIMIT,
-      rank: "SPECIES",
-      status: "ACCEPTED",
-    },
-  });
-
-  const searchResults = rankSearchResults(
-    (searchRes.data.results ?? []).map((r: Record<string, unknown>) =>
-      mapSearchCandidate(r),
-    ),
+  const queryTokens = normalizeSearchText(query).split(" ").filter(Boolean);
+  const broadIntentHint =
+    queryTokens.length === 1 ? ANIMAL_QUERY_HINTS[queryTokens[0]] : undefined;
+  const initialCandidates = await fetchSearchCandidates(
     query,
+    INITIAL_SEARCH_RESULT_LIMIT,
   );
+  let combinedCandidates = initialCandidates;
+  let searchResults = rankSearchResults(combinedCandidates, query);
+
+  if (broadIntentHint?.higherTaxonKey) {
+    const hintedCandidates = await fetchSearchCandidates(
+      query,
+      INITIAL_SEARCH_RESULT_LIMIT,
+      broadIntentHint.higherTaxonKey,
+    );
+    combinedCandidates = [...combinedCandidates, ...hintedCandidates];
+    searchResults = rankSearchResults(combinedCandidates, query);
+  }
+
+  if (
+    initialCandidates.length >= INITIAL_SEARCH_RESULT_LIMIT &&
+    searchResults.length < MIN_ANIMAL_RESULTS_BEFORE_EXPAND
+  ) {
+    const expandedCandidates = await fetchSearchCandidates(
+      query,
+      EXPANDED_SEARCH_RESULT_LIMIT,
+    );
+    combinedCandidates = [...combinedCandidates, ...expandedCandidates];
+    searchResults = rankSearchResults(combinedCandidates, query);
+
+    if (broadIntentHint?.higherTaxonKey) {
+      const expandedHintedCandidates = await fetchSearchCandidates(
+        query,
+        EXPANDED_SEARCH_RESULT_LIMIT,
+        broadIntentHint.higherTaxonKey,
+      );
+      combinedCandidates = [...combinedCandidates, ...expandedHintedCandidates];
+      searchResults = rankSearchResults(combinedCandidates, query);
+    }
+  }
 
   if (searchResults.length > 0) return searchResults;
 
@@ -250,6 +278,7 @@ function mapSearchCandidate(r: Record<string, unknown>): GbifSearchCandidate {
       genus: r.genus ? String(r.genus) : undefined,
     },
     vernacularAliases,
+    source: "search",
   };
 }
 
@@ -275,6 +304,7 @@ function mapMatchCandidate(r: Record<string, unknown>): GbifSearchCandidate {
       genus: r.genus ? String(r.genus) : undefined,
     },
     vernacularAliases: fallbackVernacular ? [fallbackVernacular] : [],
+    source: "match",
   };
 }
 
@@ -283,13 +313,16 @@ interface ScoredSearchResult {
   score: number;
   tier: number;
   quality: number;
+  bestLabel: LabelScore | null;
+  isFallback: boolean;
 }
 
 type SearchLabelSource = "vernacular" | "scientific" | "primary";
 
 interface LabelScore {
   source: SearchLabelSource;
-  label: string;
+  rawLabel: string;
+  normalizedLabel: string;
   tier: number;
   score: number;
 }
@@ -297,6 +330,7 @@ interface LabelScore {
 interface AnimalQueryIntentHint {
   families: string[];
   genera: string[];
+  higherTaxonKey?: number;
 }
 
 const ANIMAL_QUERY_HINTS: Record<string, AnimalQueryIntentHint> = {
@@ -323,6 +357,7 @@ const ANIMAL_QUERY_HINTS: Record<string, AnimalQueryIntentHint> = {
       "rangifer",
       "rusa",
     ],
+    higherTaxonKey: 5298,
   },
   eagle: {
     families: ["accipitridae"],
@@ -346,9 +381,9 @@ function rankSearchResults(
   query: string,
 ): GbifSearchResult[] {
   const scoredResults = candidates
-    .filter((candidate) => isAnimalSuggestion(candidate.result))
+    .filter((candidate) => isAnimalSuggestion(candidate))
     .map((result) => scoreSearchResult(result, query))
-    .filter((entry) => entry.tier > 0);
+    .filter((entry) => entry.tier > 0 || entry.isFallback);
 
   if (scoredResults.length === 0) {
     return [];
@@ -368,18 +403,24 @@ function rankSearchResults(
   const queryTokens = normalizeSearchText(query).split(" ").filter(Boolean);
 
   if (maxTier === EXACT_TIER && queryTokens.length > 1) {
-    return sortedResults.slice(0, 1).map((entry) => entry.result);
+    return finalizeRankedResults(sortedResults.slice(0, 1));
   }
 
-  return sortedResults
+  return finalizeRankedResults(
+    sortedResults
     .filter((entry) => {
+      if (entry.isFallback) {
+        return maxTier === 0;
+      }
+
       if (maxTier >= TOKEN_TIER) {
         return entry.tier >= TOKEN_TIER;
       }
 
       return true;
     })
-    .map((entry) => entry.result);
+    .slice(0, FINAL_RESULT_LIMIT),
+  );
 }
 
 function dedupeScoredResults(
@@ -411,8 +452,10 @@ function compareScoredResults(
     return right.quality - left.quality;
   }
 
-  const leftLabelLength = getPrimaryLabel(left.result).length;
-  const rightLabelLength = getPrimaryLabel(right.result).length;
+  const leftLabelLength =
+    left.bestLabel?.rawLabel.length ?? getPrimaryLabel(left.result).length;
+  const rightLabelLength =
+    right.bestLabel?.rawLabel.length ?? getPrimaryLabel(right.result).length;
   if (leftLabelLength !== rightLabelLength) {
     return leftLabelLength - rightLabelLength;
   }
@@ -463,12 +506,16 @@ function scoreSearchResult(
     0,
   );
   const bestLabelScore = labelScores.sort(compareLabelScores)[0];
+  const isFallback =
+    candidate.source === "match" && bestLabelScore === undefined && tier === 0;
 
   return {
     result,
-    score: bestLabelScore?.score ?? 0,
+    score: bestLabelScore?.score ?? getFallbackMatchScore(candidate.result),
     tier,
     quality: getSearchResultQuality(result),
+    bestLabel: bestLabelScore ?? null,
+    isFallback,
   };
 }
 
@@ -479,8 +526,9 @@ function scoreLabelMatch(
   queryTokens: string[],
   result: GbifSearchResult,
 ): LabelScore | null {
-  const label = normalizeSearchText(rawLabel);
-  const tier = getMatchTier(label, normalizedQuery, queryTokens);
+  const normalizedLabel = normalizeSearchText(rawLabel);
+  const displayLabel = rawLabel?.trim();
+  const tier = getMatchTier(normalizedLabel, normalizedQuery, queryTokens);
   if (tier === 0) {
     return null;
   }
@@ -490,11 +538,22 @@ function scoreLabelMatch(
 
   if (isBroadSingleTokenQuery) {
     const queryToken = queryTokens[0];
-    score += getSingleTokenBonus(label, queryToken);
-    score += getBroadAnimalIntentAdjustment(label, queryToken, source, result);
+    score += getSingleTokenBonus(normalizedLabel, queryToken);
+    score += getBroadAnimalIntentAdjustment(
+      normalizedLabel,
+      queryToken,
+      source,
+      result,
+    );
   }
 
-  return { source, label, tier, score };
+  return {
+    source,
+    rawLabel: displayLabel || rawLabel || "",
+    normalizedLabel,
+    tier,
+    score,
+  };
 }
 
 function getBaseScore(
@@ -534,7 +593,7 @@ function compareLabelScores(left: LabelScore, right: LabelScore): number {
     return right.tier - left.tier;
   }
 
-  return left.label.length - right.label.length;
+  return left.normalizedLabel.length - right.normalizedLabel.length;
 }
 
 function getMatchTier(
@@ -621,20 +680,23 @@ function getBroadAnimalIntentAdjustment(
     score += 70;
   }
 
+  const offIntentCompoundPenalty = queryToken === "deer" ? 180 : 90;
+  const offIntentInnerPenalty = queryToken === "deer" ? 120 : 70;
+
   if (source !== "scientific" && tokenIndex === 0 && labelTokens.length > 1) {
-    score -= 85;
+    score -= offIntentCompoundPenalty;
   } else if (
     source !== "scientific" &&
     tokenIndex > 0 &&
     tokenIndex < labelTokens.length - 1
   ) {
-    score -= 45;
+    score -= offIntentInnerPenalty;
   }
 
   if (taxonomyIntentStrength === 2) {
     score += 110;
   } else if (taxonomyIntentStrength === 1) {
-    score += 60;
+    score += queryToken === "deer" ? 180 : 60;
   } else if (source !== "scientific" && tokenIndex === 0 && labelTokens.length > 1) {
     score -= 25;
   }
@@ -696,6 +758,18 @@ function getSearchResultQuality(result: GbifSearchResult): number {
   return quality;
 }
 
+function getFallbackMatchScore(result: GbifSearchResult): number {
+  const confidence = result.confidence ?? 0;
+  const matchType = normalizeSearchText(result.matchType);
+  let score = 40 + confidence;
+
+  if (matchType === "exact") score += 40;
+  else if (matchType === "fuzzy") score += 15;
+  else if (matchType === "higherrank") score -= 10;
+
+  return score;
+}
+
 function getPrimaryLabel(result: GbifSearchResult): string {
   return result.vernacularName?.trim() || getScientificLabel(result);
 }
@@ -704,12 +778,13 @@ function getScientificLabel(result: GbifSearchResult): string {
   return result.canonicalName || result.scientificName;
 }
 
-function isAnimalSuggestion(result: GbifSearchResult): boolean {
-  const normalizedKingdom = normalizeSearchText(result.kingdom);
+function isAnimalSuggestion(candidate: GbifSearchCandidate): boolean {
+  const normalizedKingdom = normalizeSearchText(candidate.result.kingdom);
   return (
-    normalizedKingdom === "" ||
     normalizedKingdom === "animalia" ||
-    normalizedKingdom === "metazoa"
+    normalizedKingdom === "metazoa" ||
+    (normalizedKingdom === "" &&
+      (candidate.source === "match" || isClearlyAnimalTaxonomy(candidate.result)))
   );
 }
 
@@ -759,6 +834,60 @@ function getEnglishVernacularAliases(r: Record<string, unknown>): string[] {
 
 function getFallbackVernacularName(r: Record<string, unknown>): string | undefined {
   return r.vernacularName ? String(r.vernacularName) : undefined;
+}
+
+async function fetchSearchCandidates(
+  query: string,
+  limit: number,
+  higherTaxonKey?: number,
+): Promise<GbifSearchCandidate[]> {
+  const searchRes = await client.get("/species/search", {
+    params: {
+      q: query,
+      qField: "VERNACULAR",
+      ...(higherTaxonKey ? { higherTaxonKey } : {}),
+      limit,
+      rank: "SPECIES",
+      status: "ACCEPTED",
+    },
+  });
+
+  return (searchRes.data.results ?? []).map((r: Record<string, unknown>) =>
+    mapSearchCandidate(r),
+  );
+}
+
+function finalizeRankedResults(
+  entries: ScoredSearchResult[],
+): GbifSearchResult[] {
+  return entries.map((entry) => {
+    if (
+      entry.bestLabel?.source === "vernacular" &&
+      entry.bestLabel.rawLabel.trim().length > 0
+    ) {
+      return { ...entry.result, vernacularName: entry.bestLabel.rawLabel };
+    }
+
+    return entry.result;
+  });
+}
+
+function isClearlyAnimalTaxonomy(result: GbifSearchResult): boolean {
+  const normalizedPhylum = normalizeSearchText(result.phylum);
+  const normalizedClass = normalizeSearchText(result.class);
+
+  return (
+    normalizedPhylum === "chordata" ||
+    [
+      "amphibia",
+      "arachnida",
+      "aves",
+      "chondrichthyes",
+      "insecta",
+      "mammalia",
+      "reptilia",
+    ].includes(normalizedClass)
+  );
 }
 
 function mapOccurrence(r: Record<string, unknown>): GbifOccurrence {

@@ -13,31 +13,34 @@ interface GbifSearchReturn {
 export function useGbifSearch(query: string): GbifSearchReturn {
   const trimmedQuery = query.trim();
   const debouncedQuery = useDebounce(trimmedQuery, 400);
+  const hasMinimumQueryLength = trimmedQuery.length >= 2;
+  const effectiveQuery = hasMinimumQueryLength ? debouncedQuery : "";
 
   const { data, isLoading, error } = useQuery<{ results: GbifSearchResult[] }>(
     {
-      queryKey: ["gbif-search", debouncedQuery],
+      queryKey: ["gbif-search", effectiveQuery],
       queryFn: async () => {
-        const params = new URLSearchParams({ q: debouncedQuery });
+        const params = new URLSearchParams({ q: effectiveQuery });
         const res = await fetch(`/api/gbif/search?${params.toString()}`);
         if (!res.ok) throw new Error("GBIF search failed");
         return res.json();
       },
-      enabled: debouncedQuery.length >= 2,
+      enabled: effectiveQuery.length >= 2,
       staleTime: 60_000,
       retry: 1,
     },
   );
 
   const isDebouncing =
-    trimmedQuery.length >= 2 && debouncedQuery !== trimmedQuery;
-  const results = isDebouncing ? [] : (data?.results ?? []);
+    hasMinimumQueryLength && debouncedQuery !== trimmedQuery;
+  const results =
+    !hasMinimumQueryLength || isDebouncing ? [] : (data?.results ?? []);
   const bestMatch = results.length > 0 ? results[0] : null;
 
   return {
     results,
     bestMatch,
-    isLoading: isDebouncing || isLoading,
+    isLoading: hasMinimumQueryLength && (isDebouncing || isLoading),
     isDebouncing,
     error: error as Error | null,
   };
