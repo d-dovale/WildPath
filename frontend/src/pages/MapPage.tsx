@@ -29,6 +29,7 @@ export default function MapPage() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [mapInstance, setMapInstance] = useState<mapboxgl.Map | null>(null);
 
   const [showPaths, setShowPaths] = useState(false);
   const [viewedSpeciesId, setViewedSpeciesId] = useState<string | null>(null);
@@ -95,7 +96,7 @@ export default function MapPage() {
 
   // GBIF density tile layer
   useGbifDensityLayer({
-    map: mapRef.current,
+    map: mapInstance,
     mapReady,
     taxonKey: gbifTaxonKey,
     enabled: isGbifMode && showDensity,
@@ -104,7 +105,7 @@ export default function MapPage() {
   // GeoJSON markers + clustering (replaces DOM markers)
   useMapMarkers({
     sightings: activeSightings,
-    map: mapRef.current,
+    map: mapInstance,
     mapReady,
     isGbifMode,
   });
@@ -114,6 +115,7 @@ export default function MapPage() {
     const map = mapRef.current;
     if (!map) return;
     const bounds = map.getBounds();
+    if (!bounds) return;
     setBbox([
       bounds.getWest(),
       bounds.getSouth(),
@@ -126,7 +128,6 @@ export default function MapPage() {
   useEffect(() => {
     if (!ENABLE_MAP || !mapContainerRef.current) return;
 
-    setMapReady(false);
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: "mapbox://styles/mapbox/outdoors-v12",
@@ -135,6 +136,7 @@ export default function MapPage() {
       zoom: 3,
     });
     mapRef.current = map;
+    setMapInstance(map);
 
     const onLoad = () => setMapReady(true);
     map.once("load", onLoad);
@@ -152,6 +154,7 @@ export default function MapPage() {
       map.off("load", onLoad);
       map.remove();
       mapRef.current = null;
+      setMapInstance(null);
       setMapReady(false);
     };
   }, [handleMoveEnd]);
@@ -159,7 +162,7 @@ export default function MapPage() {
   // Movement paths layer (MoveBank only)
   useMovementPaths({
     sightings: isGbifMode ? undefined : movebankSightings,
-    map: mapRef.current,
+    map: mapInstance,
     enabled: showPaths && !isGbifMode,
     mapReady,
   });
@@ -178,6 +181,7 @@ export default function MapPage() {
             </h2>
             <SpeciesSearch
               searchQuery={searchQuery}
+              selectedSpecies={gbifBestMatch}
               onSearchChange={(q) => {
                 setSearchQuery(q);
                 if (q.trim().length === 0) {
@@ -190,7 +194,13 @@ export default function MapPage() {
               }}
               onGbifTaxonKeyChange={setGbifTaxonKey}
               onDataSourceChange={setDataSource}
-              onBestMatchChange={setGbifBestMatch}
+              onBestMatchChange={(match) => {
+                setGbifBestMatch(match);
+                if (match) {
+                  setSpeciesId(null);
+                  setViewedSpeciesId(null);
+                }
+              }}
             />
 
             {/* Sighting count and source indicator */}

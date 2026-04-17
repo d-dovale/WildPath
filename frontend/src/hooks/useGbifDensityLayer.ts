@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type mapboxgl from "mapbox-gl";
+import type { ErrorEvent, Map } from "mapbox-gl";
 
 const SOURCE_ID = "gbif-density";
 const LAYER_ID = "gbif-density-layer";
@@ -8,13 +8,13 @@ const GBIF_TILE_URL =
   "https://api.gbif.org/v2/map/occurrence/density/{z}/{x}/{y}@1x.png";
 
 interface Options {
-  map: mapboxgl.Map | null;
+  map: Map | null;
   mapReady: boolean;
   taxonKey: number | null;
   enabled: boolean;
 }
 
-function cleanup(map: mapboxgl.Map) {
+function cleanup(map: Map) {
   if (map.getLayer(LAYER_ID)) map.removeLayer(LAYER_ID);
   if (map.getSource(SOURCE_ID)) map.removeSource(SOURCE_ID);
 }
@@ -55,7 +55,7 @@ export function useGbifDensityLayer({
     });
 
     // Suppress tile decode errors for GBIF tiles
-    const onError = (e: mapboxgl.ErrorEvent) => {
+    const onError = (e: ErrorEvent) => {
       const msg = e.error?.message ?? "";
       if (msg.includes("Could not load image")) {
         return;
