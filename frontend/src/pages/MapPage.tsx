@@ -66,8 +66,6 @@ export default function MapPage() {
     queryKey: ["sightings", queryParams],
     queryFn: async () => {
       const params = new URLSearchParams(queryParams);
-      // Backend PR: Limit increased to 2000 for better clustering/path data
-      params.set('limit', '2000'); 
       const res = await fetch(`/api/sightings?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch sightings");
       return res.json();
@@ -91,23 +89,9 @@ export default function MapPage() {
 
   // Select active data based on source
   const isGbifMode = dataSource === "gbif" && gbifTaxonKey !== null;
-
-  // --- ADDED FOR CLUSTERING: Deduplicate points by animal_id ---
-  const activeSightings = (() => {
-    const rawData = isGbifMode ? gbifSightings : (movebankSightings ?? []);
-    if (isGbifMode) return rawData;
-
-    // Clustering logic: display the latest sighting per animal as a clusterable point
-    const latestMap = new Map<string, Sighting>();
-    rawData.forEach(s => {
-      const current = latestMap.get(s.animal_id);
-      if (!current || new Date(s.timestamp) > new Date(current.timestamp)) {
-        latestMap.set(s.animal_id, s);
-      }
-    });
-    return Array.from(latestMap.values());
-  })();
-
+  const activeSightings = isGbifMode
+    ? gbifSightings
+    : (movebankSightings ?? []);
   const isLoading = isGbifMode ? gbifLoading : movebankLoading;
 
   // GBIF density tile layer
@@ -118,7 +102,7 @@ export default function MapPage() {
     enabled: isGbifMode && showDensity,
   });
 
-  // GeoJSON markers + clustering (Replaces markers logic with layer-based clustering)
+  // GeoJSON markers + clustering (replaces DOM markers)
   useMapMarkers({
     sightings: activeSightings,
     map: mapInstance,
@@ -223,7 +207,7 @@ export default function MapPage() {
             <div className="text-sm font-medium mt-2">
               {isLoading ? (
                 <span className="flex items-center gap-2 text-blue-500 animate-pulse">
-                  Updating sightings...
+                  Loading sightings...
                 </span>
               ) : (
                 <span className="text-muted-foreground">
@@ -261,7 +245,7 @@ export default function MapPage() {
             </div>
           </div>
 
-          {/* Species info card - Enriched via Backend Species API */}
+          {/* Species info card */}
           {isGbifMode && gbifTaxonKey && (
             <div className="px-6 pb-4">
               <GbifSpeciesInfoCard
@@ -340,10 +324,6 @@ export default function MapPage() {
                   onCheckedChange={setShowPaths}
                 />
               )}
-
-              {/* Skeletons from original PR additions */}
-              <div className="h-10 w-full bg-muted/50 rounded-md animate-pulse" />
-              <div className="h-24 w-full bg-muted/50 rounded-md animate-pulse" />
             </div>
           </div>
 
