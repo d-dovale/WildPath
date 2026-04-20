@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import Navbar from "../components/ui/navbar";
@@ -24,6 +24,8 @@ import { useQuery } from "@tanstack/react-query";
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 
 const ENABLE_MAP = true;
+const SECTION_CARD_CLASS =
+  "rounded-[1.75rem] border border-white/15 bg-white/8 px-5 py-5 shadow-[0_12px_30px_rgba(0,0,0,0.12)] backdrop-blur-sm";
 
 export default function MapPage() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -58,19 +60,47 @@ export default function MapPage() {
     setYearPreset,
     yearParam,
   } = useMapFilters();
+  const selectedMovebankSpeciesId = speciesId ?? viewedSpeciesId;
+  const movebankDisplayQuery = useMemo(() => {
+    const params = new URLSearchParams(queryParams);
+    if (selectedMovebankSpeciesId) {
+      params.set("species_id", selectedMovebankSpeciesId);
+    } else {
+      params.delete("species_id");
+    }
+    return params.toString();
+  }, [queryParams, selectedMovebankSpeciesId]);
+  const movebankVisibleAreaQuery = useMemo(() => {
+    const params = new URLSearchParams(queryParams);
+    params.delete("species_id");
+    return params.toString();
+  }, [queryParams]);
 
-  // MoveBank sightings — only active when not in GBIF mode
+  // MoveBank sightings shown on the map — only when a species is selected
   const { data: movebankSightings, isLoading: movebankLoading } = useQuery<
     Sighting[]
   >({
-    queryKey: ["sightings", queryParams],
+    queryKey: ["sightings", "selected", movebankDisplayQuery],
     queryFn: async () => {
-      const params = new URLSearchParams(queryParams);
-      const res = await fetch(`/api/sightings?${params.toString()}`);
+      const res = await fetch(`/api/sightings?${movebankDisplayQuery}`);
       if (!res.ok) throw new Error("Failed to fetch sightings");
       return res.json();
     },
-    enabled: dataSource !== "gbif",
+    enabled: dataSource !== "gbif" && selectedMovebankSpeciesId !== null,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+
+  // Visible-area species source data — used only to populate the lower list
+  const { data: visibleAreaSightings } = useQuery<Sighting[]>({
+    queryKey: ["sightings", "visible-area", movebankVisibleAreaQuery],
+    queryFn: async () => {
+      const res = await fetch(`/api/sightings?${movebankVisibleAreaQuery}`);
+      if (!res.ok) throw new Error("Failed to fetch sightings");
+      return res.json();
+    },
+    enabled: dataSource !== "gbif" && bboxEnabled,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     retry: false,
@@ -93,6 +123,11 @@ export default function MapPage() {
     ? gbifSightings
     : (movebankSightings ?? []);
   const isLoading = isGbifMode ? gbifLoading : movebankLoading;
+  const hasSpeciesDetail =
+    (isGbifMode && gbifTaxonKey !== null) ||
+    (!isGbifMode && (speciesId !== null || viewedSpeciesId !== null));
+  const showSpeciesInArea =
+    !isGbifMode && bboxEnabled && !!visibleAreaSightings?.length;
 
   // GBIF density tile layer
   useGbifDensityLayer({
@@ -169,163 +204,178 @@ export default function MapPage() {
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden">
-      <Navbar hideSearch />
+      <Navbar />
 
       <div className="flex flex-1 overflow-hidden">
         {/* sidebar */}
-        <aside className="w-80 border-r bg-card flex flex-col shadow-sm z-10 overflow-y-auto">
-          {/* Species search */}
-          <div className="p-6 pb-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-              Species
-            </h2>
-            <SpeciesSearch
-              searchQuery={searchQuery}
-              selectedSpecies={gbifBestMatch}
-              onSearchChange={(q) => {
-                setSearchQuery(q);
-                if (q.trim().length === 0) {
-                  setGbifTaxonKey(null);
-                  setDataSource(null);
-                  setSpeciesId(null);
-                  setViewedSpeciesId(null);
-                  setGbifBestMatch(null);
-                }
-              }}
-              onGbifTaxonKeyChange={setGbifTaxonKey}
-              onDataSourceChange={setDataSource}
-              onBestMatchChange={(match) => {
-                setGbifBestMatch(match);
-                if (match) {
-                  setSpeciesId(null);
-                  setViewedSpeciesId(null);
-                }
-              }}
-            />
-
-            {/* Sighting count and source indicator */}
-            <div className="text-sm font-medium mt-2">
-              {isLoading ? (
-                <span className="flex items-center gap-2 text-blue-500 animate-pulse">
-                  Loading sightings...
-                </span>
-              ) : (
-                <span className="text-muted-foreground">
-                  {isGbifMode ? (
-                    <>
-                      {activeSightings.length} occurrences
-                      <span className="inline-block ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
-                        GBIF
-                      </span>
-                      {gbifTotalCount > 300 && (
-                        <span className="block text-xs mt-1 text-muted-foreground">
-                          Showing 300 of {gbifTotalCount.toLocaleString()}{" "}
-                          total.
-                          {showDensity
-                            ? " Density layer shows full range."
-                            : " Enable density layer for full coverage."}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      Found {activeSightings.length} locations
-                      <span className="inline-block ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                        MoveBank
-                      </span>
-                      {bboxEnabled && bbox && activeSightings.length === 0 && (
-                        <span className="block text-xs mt-1">
-                          Try zooming out or disabling viewport filter
-                        </span>
-                      )}
-                    </>
-                  )}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Species info card */}
-          {isGbifMode && gbifTaxonKey && (
-            <div className="px-6 pb-4">
-              <GbifSpeciesInfoCard
-                taxonKey={gbifTaxonKey}
-                vernacularNameOverride={gbifBestMatch?.vernacularName}
+        <aside className="z-10 flex w-80 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-sm">
+          {/* Species section */}
+          <section className="relative z-20 px-4 pb-4 pt-4">
+            <div className={SECTION_CARD_CLASS}>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+                Species
+              </h2>
+              <SpeciesSearch
+                searchQuery={searchQuery}
+                selectedSpecies={gbifBestMatch}
+                onSearchChange={(q) => {
+                  setSearchQuery(q);
+                  if (q.trim().length === 0) {
+                    setGbifTaxonKey(null);
+                    setDataSource(null);
+                    setSpeciesId(null);
+                    setViewedSpeciesId(null);
+                    setGbifBestMatch(null);
+                  }
+                }}
+                onGbifTaxonKeyChange={setGbifTaxonKey}
+                onDataSourceChange={setDataSource}
+                onBestMatchChange={(match) => {
+                  setGbifBestMatch(match);
+                  if (match) {
+                    setSpeciesId(null);
+                    setViewedSpeciesId(null);
+                  }
+                }}
               />
-            </div>
-          )}
-          {!isGbifMode && (speciesId || viewedSpeciesId) && (
-            <div className="px-6 pb-4">
-              <SpeciesInfoCard speciesId={(speciesId ?? viewedSpeciesId)!} />
-            </div>
-          )}
 
-          {/* Species in visible area (MoveBank mode only) */}
-          {!isGbifMode &&
-            !speciesId &&
-            movebankSightings &&
-            movebankSightings.length > 0 && (
-              <div className="px-6 pb-4">
+              {/* Sighting count and source indicator */}
+              <div className="text-sm font-medium mt-2">
+                {isLoading ? (
+                  <span className="flex items-center gap-2 text-blue-500 animate-pulse">
+                    Loading sightings...
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    {isGbifMode ? (
+                      <>
+                        {activeSightings.length} occurrences
+                        <span className="inline-block ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
+                          GBIF
+                        </span>
+                        {gbifTotalCount > 300 && (
+                          <span className="block text-xs mt-1 text-muted-foreground">
+                            Showing 300 of {gbifTotalCount.toLocaleString()}{" "}
+                            total.
+                            {showDensity
+                              ? " Density layer shows full range."
+                              : " Enable density layer for full coverage."}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        Found {activeSightings.length} locations
+                        <span className="inline-block ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                          MoveBank
+                        </span>
+                        {bboxEnabled &&
+                          bbox &&
+                          activeSightings.length === 0 && (
+                            <span className="block text-xs mt-1">
+                              Try zooming out or disabling viewport filter
+                            </span>
+                          )}
+                      </>
+                    )}
+                  </span>
+                )}
+              </div>
+              {hasSpeciesDetail ? (
+                <div className="mt-5 border-t border-white/12 pt-5 space-y-5">
+                  {isGbifMode && gbifTaxonKey && (
+                    <GbifSpeciesInfoCard
+                      taxonKey={gbifTaxonKey}
+                      vernacularNameOverride={gbifBestMatch?.vernacularName}
+                      embedded
+                    />
+                  )}
+
+                  {!isGbifMode && (speciesId || viewedSpeciesId) && (
+                    <SpeciesInfoCard
+                      speciesId={speciesId ?? viewedSpeciesId!}
+                      embedded
+                    />
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </section>
+
+          {/* Filters section */}
+          <section className="relative z-0 px-4 pb-4">
+            <div className={SECTION_CARD_CLASS}>
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+                Filters
+              </h2>
+              <div className="space-y-4">
+                {!isGbifMode && (
+                  <TimeRangeFilter
+                    value={timePreset}
+                    onChange={setTimePreset}
+                  />
+                )}
+
+                {isGbifMode && (
+                  <GbifYearFilter value={yearPreset} onChange={setYearPreset} />
+                )}
+
+                <div className="flex items-center justify-between">
+                  <Label
+                    htmlFor="bbox-filter"
+                    className="text-sm cursor-pointer"
+                  >
+                    Filter by visible area
+                  </Label>
+                  <Switch
+                    id="bbox-filter"
+                    checked={bboxEnabled}
+                    onCheckedChange={(checked) => {
+                      setBboxEnabled(checked);
+                      if (!checked) {
+                        setViewedSpeciesId(null);
+                      }
+                    }}
+                  />
+                </div>
+
+                {isGbifMode && (
+                  <div className="flex items-center justify-between">
+                    <Label
+                      htmlFor="density-toggle"
+                      className="text-sm cursor-pointer"
+                    >
+                      Show density heatmap
+                    </Label>
+                    <Switch
+                      id="density-toggle"
+                      checked={showDensity}
+                      onCheckedChange={setShowDensity}
+                    />
+                  </div>
+                )}
+
+                {!isGbifMode && (
+                  <MovementPathsToggle
+                    checked={showPaths}
+                    onCheckedChange={setShowPaths}
+                  />
+                )}
+              </div>
+            </div>
+          </section>
+
+          {showSpeciesInArea && (
+            <section className="relative z-0 px-4 pb-6">
+              <div className={SECTION_CARD_CLASS}>
                 <SpeciesInArea
-                  sightings={movebankSightings}
+                  sightings={visibleAreaSightings}
                   onSelectSpecies={setViewedSpeciesId}
                   selectedSpeciesId={viewedSpeciesId}
                 />
               </div>
-            )}
-
-          {/* Filters section */}
-          <div className="px-6 pb-6">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-              Filters
-            </h2>
-            <div className="space-y-4">
-              {!isGbifMode && (
-                <TimeRangeFilter value={timePreset} onChange={setTimePreset} />
-              )}
-
-              {isGbifMode && (
-                <GbifYearFilter value={yearPreset} onChange={setYearPreset} />
-              )}
-
-              <div className="flex items-center justify-between">
-                <Label
-                  htmlFor="bbox-filter"
-                  className="text-sm cursor-pointer"
-                >
-                  Filter by visible area
-                </Label>
-                <Switch
-                  id="bbox-filter"
-                  checked={bboxEnabled}
-                  onCheckedChange={setBboxEnabled}
-                />
-              </div>
-
-              {isGbifMode && (
-                <div className="flex items-center justify-between">
-                  <Label
-                    htmlFor="density-toggle"
-                    className="text-sm cursor-pointer"
-                  >
-                    Show density heatmap
-                  </Label>
-                  <Switch
-                    id="density-toggle"
-                    checked={showDensity}
-                    onCheckedChange={setShowDensity}
-                  />
-                </div>
-              )}
-
-              {!isGbifMode && (
-                <MovementPathsToggle
-                  checked={showPaths}
-                  onCheckedChange={setShowPaths}
-                />
-              )}
-            </div>
-          </div>
+            </section>
+          )}
 
           {/* GBIF attribution */}
           {isGbifMode && (
