@@ -6,6 +6,12 @@ Use the deployed website here:
 
 https://wild-path-frontend-navy.vercel.app/
 
+## GitHub Repository
+
+Project source code:
+
+https://github.com/d-dovale/WildPath
+
 ## Purpose
 
 WildPath helps users explore wildlife data through an interactive map and a quiz. The site combines two kinds of wildlife information:
