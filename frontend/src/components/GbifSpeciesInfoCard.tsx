@@ -4,6 +4,7 @@ import type { GbifSpeciesDetail } from "@/types/gbif";
 interface Props {
   taxonKey: number;
   vernacularNameOverride?: string;
+  embedded?: boolean;
 }
 
 const IUCN_COLORS: Record<string, string> = {
@@ -32,6 +33,7 @@ const IUCN_LABELS: Record<string, string> = {
 export default function GbifSpeciesInfoCard({
   taxonKey,
   vernacularNameOverride,
+  embedded = false,
 }: Props) {
   const {
     data: species,
@@ -50,7 +52,9 @@ export default function GbifSpeciesInfoCard({
 
   if (isLoading) {
     return (
-      <div className="rounded-lg border bg-card overflow-hidden animate-pulse">
+      <div
+        className={`${embedded ? "overflow-hidden" : "rounded-lg border bg-card overflow-hidden"} animate-pulse`}
+      >
         <div className="h-40 bg-muted" />
         <div className="p-4 space-y-3">
           <div className="h-5 bg-muted rounded w-3/4" />
@@ -90,7 +94,11 @@ export default function GbifSpeciesInfoCard({
   ].filter(Boolean);
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div
+      className={
+        embedded ? "overflow-hidden" : "rounded-lg border bg-card overflow-hidden"
+      }
+    >
       {imageUrl && (
         <img
           src={imageUrl}

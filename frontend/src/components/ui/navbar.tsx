@@ -29,7 +29,7 @@ export default function Navbar({
           <Leaf className="w-5 h-5 text-green-600" />
           <span className="font-bold text-lg tracking-tight">WildPath</span>
         </button>
-        <nav className="flex items-center gap-1">
+        <nav className="flex items-center gap-1 rounded-full border border-white/10 bg-black/10 p-1 shadow-sm">
           <NavButton
             icon={<MapIcon className="w-4 h-4" />}
             label="Explore"
@@ -63,10 +63,10 @@ function NavButton({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+      className={`flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-medium transition-all ${
         active
-          ? "bg-primary/10 text-primary"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          ? "bg-white/90 text-emerald-900 shadow-sm ring-1 ring-white/60"
+          : "text-white/80 hover:bg-white/12 hover:text-white"
       }`}
     >
       {icon}

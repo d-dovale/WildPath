@@ -147,7 +147,7 @@ export default function SpeciesSearch({
   const showDropdown = hasMinQuery && isOpen && !isSelectedQuery;
 
   return (
-    <div>
+    <div className="relative z-40">
       <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
         Search Species
       </label>
@@ -191,7 +191,7 @@ export default function SpeciesSearch({
             {isLoading ? (
               <div
                 role="status"
-                className="absolute z-20 mt-1 w-full rounded-md border bg-background px-3 py-2 text-xs text-blue-500 shadow-md animate-pulse"
+                className="absolute z-[70] mt-1 w-full rounded-md border bg-background px-3 py-2 text-xs text-blue-500 shadow-md animate-pulse"
               >
                 Searching GBIF...
               </div>
@@ -199,7 +199,7 @@ export default function SpeciesSearch({
               <div
                 id="species-search-suggestions"
                 role="listbox"
-                className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border bg-background shadow-md"
+                className="absolute z-[70] mt-1 w-full overflow-hidden rounded-md border bg-background shadow-md"
               >
               <div className="max-h-72 overflow-y-auto py-1">
                 {suggestions.map((result, index) => {
@@ -241,7 +241,7 @@ export default function SpeciesSearch({
             ) : (
               <div
                 role="status"
-                className="absolute z-20 mt-1 w-full rounded-md border bg-background px-3 py-2 text-xs text-muted-foreground shadow-md"
+                className="absolute z-[70] mt-1 w-full rounded-md border bg-background px-3 py-2 text-xs text-muted-foreground shadow-md"
               >
                 No species found. Try a different name.
               </div>

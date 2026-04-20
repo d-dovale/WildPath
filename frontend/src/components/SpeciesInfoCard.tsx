@@ -3,9 +3,10 @@ import type { SpeciesDetail } from '@/types/species'
 
 interface Props {
   speciesId: string
+  embedded?: boolean
 }
 
-export default function SpeciesInfoCard({ speciesId }: Props) {
+export default function SpeciesInfoCard({ speciesId, embedded = false }: Props) {
   const { data: species, isLoading, error } = useQuery<SpeciesDetail>({
     queryKey: ['species-detail', speciesId],
     queryFn: async () => {
@@ -19,7 +20,7 @@ export default function SpeciesInfoCard({ speciesId }: Props) {
 
   if (isLoading) {
     return (
-      <div className="rounded-lg border bg-card overflow-hidden animate-pulse">
+      <div className={`${embedded ? 'overflow-hidden' : 'rounded-lg border bg-card overflow-hidden'} animate-pulse`}>
         <div className="h-40 bg-muted" />
         <div className="p-4 space-y-3">
           <div className="h-5 bg-muted rounded w-3/4" />
@@ -40,7 +41,7 @@ export default function SpeciesInfoCard({ speciesId }: Props) {
   ].filter((row) => row.value)
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div className={embedded ? "overflow-hidden" : "rounded-lg border bg-card overflow-hidden"}>
       {species.image_url && (
         <img
           src={species.image_url}
