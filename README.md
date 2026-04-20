@@ -1,199 +1,203 @@
 # WildPath
 
-> Making Wildlife Data Accessible, Interactive, and Fun
+WildPath is an interactive wildlife exploration app that makes animal movement and biodiversity data easier to browse, understand, and compare. The project combines tracked animal sightings stored in Supabase with live GBIF occurrence data, then presents both through a map-based interface and a lightweight quiz experience.
 
-WildPath is a web application that redesigns animal tracking around clarity, accessibility, and engagement. Instead of expert-focused tools packed with dense data, it presents wildlife information through intuitive, interactive maps approachable to everyday users.
+## Core Features
 
----
+- Interactive Explore page with Mapbox-based wildlife mapping
+- Live GBIF species search and occurrence lookup
+- Stored MoveBank tracking data shown as tracked-animal sightings
+- Optional GBIF density heatmap for broader species coverage
+- Time and visible-area filters
+- MoveBank movement path visualization
+- Animal ID quiz generated from species records with cached image enrichment
+
+## Data Sources
+
+- MoveBank: source for tracked-animal study, animal, and sighting data ingested into Supabase
+- GBIF: live species search, species detail lookup, and occurrence mapping
+- iNaturalist: enrichment for species images and conservation data
+- Wikipedia: enrichment for species descriptions and fallback imagery
+
+Important note: the current Python ingestion pipeline writes MoveBank data into the database. GBIF is used live through backend API routes rather than being ingested by the pipeline.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────┐
-│                     Browser                         │
-│           React + Vite + Mapbox GL JS               │
-└─────────────────────┬───────────────────────────────┘
-                      │ HTTP (REST)
-┌─────────────────────▼───────────────────────────────┐
-│               Node.js + Express API                 │
-│              (serves processed data)                │
-└─────────────────────┬───────────────────────────────┘
-                      │
-┌─────────────────────▼───────────────────────────────┐
-│              Supabase (PostgreSQL + PostGIS)         │
-│             (stores processed wildlife data)        │
-└─────────────────────▲───────────────────────────────┘
-                      │ write
-┌─────────────────────┴───────────────────────────────┐
-│            Python Ingestion Pipeline                │
-│         pandas · MoveBank API · iNaturalist         │
-└─────────────────────────────────────────────────────┘
-```
+WildPath has three main layers:
 
----
+1. `frontend/`: React + Vite client with Mapbox, filters, species cards, and quiz UI
+2. `backend/`: Express + TypeScript API for species, sightings, insights, quiz, and GBIF endpoints
+3. `pipeline/`: Python ingestion pipeline that imports MoveBank study data into Supabase
 
-## Tech Stack
+Persistent project data is stored in Supabase PostgreSQL. The frontend talks to the backend through `/api/*` routes, and the backend reads from Supabase plus external data providers.
 
-| Layer       | Technology                                      |
-|-------------|--------------------------------------------------|
-| Frontend    | React 19, Vite, TypeScript, Tailwind CSS, shadcn/ui |
-| Map         | Mapbox GL JS, react-map-gl                      |
-| Data Fetching | TanStack React Query, Axios                  |
-| Backend     | Node.js, Express, TypeScript                    |
-| Database    | Supabase (PostgreSQL + PostGIS)                 |
-| Data APIs   | MoveBank API, iNaturalist API                   |
-| Pipeline    | Python, pandas, Supabase Python SDK             |
+## Current Database Model
 
----
+The live schema in this repo is centered on these tables:
+
+- `studies`: imported data-source studies, currently used for MoveBank studies
+- `species`: species-level metadata and enriched fields such as `image_url`, `range`, and `wikipedia_url`
+- `animals`: tracked individual animals linked to `species` and optionally `studies`
+- `sightings`: timestamped latitude/longitude points linked to `animals`
+
+Additional database details:
+
+- `studies` has a unique upsert key on `(source, source_id)`
+- `sightings` has a unique upsert key on `(animal_id, timestamp)`
+- `api_insights` is a Supabase SQL function used by the backend for filtered map aggregates
+
+Quiz questions are not stored in dedicated database tables in the current implementation. They are generated on demand from `species` rows that have images available or can be enriched at request time.
+
+## API Summary
+
+Main backend routes:
+
+- `GET /api/species`: search local stored species
+- `GET /api/species/:id`: fetch enriched stored-species detail
+- `GET /api/sightings`: fetch MoveBank-backed tracked sightings
+- `GET /api/insights`: fetch aggregate counts for the current filters
+- `GET /api/quiz`: generate quiz questions from enriched species records
+- `GET /api/gbif/search`: search GBIF species
+- `GET /api/gbif/occurrences`: fetch GBIF occurrence points
+- `GET /api/gbif/species/:key`: fetch GBIF species detail with enrichment
+- `GET /health`: health check
+
+Detailed route behavior is documented in [backend/API.md](backend/API.md).
 
 ## Project Structure
 
-```
+```text
 WildPath/
-├── frontend/        # React + Vite app
-├── backend/         # Node.js + Express API server
-├── pipeline/        # Python data ingestion scripts
-├── package.json     # Root workspace + dev scripts
-└── README.md
+|-- frontend/             # React + Vite client
+|-- backend/              # Express + TypeScript API
+|-- pipeline/             # Python MoveBank ingestion pipeline
+|-- supabase/migrations/  # schema and SQL migration files
+|-- docs/images/          # submission/reference images
+|-- USER_MANUAL.md        # end-user documentation
+`-- README.md             # project overview
 ```
 
----
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, Vite, TypeScript, Tailwind CSS, shadcn/ui |
+| Map | Mapbox GL JS |
+| State / Data Fetching | TanStack React Query |
+| Backend | Node.js, Express, TypeScript |
+| Database | Supabase PostgreSQL |
+| Pipeline | Python, pandas, Supabase Python SDK |
+| External Data | MoveBank, GBIF, iNaturalist, Wikipedia |
 
 ## Getting Started
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) v20+
-- [Python](https://www.python.org/) 3.11+
-- [pip](https://pip.pypa.io/)
-- A [Supabase](https://supabase.com/) project
-- A [Mapbox](https://www.mapbox.com/) account (for the access token)
+- Node.js 20+
+- Python 3.11+
+- pip
+- Supabase project
+- Mapbox token
+- MoveBank account credentials
 
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/your-org/wildpath.git
-cd wildpath
-```
-
-### 2. Install Node.js dependencies
+### Install dependencies
 
 ```bash
 npm install
-```
-
-This installs dependencies for both `frontend/` and `backend/` via npm workspaces.
-
-### 3. Install Python dependencies
-
-```bash
 cd pipeline
 pip install -r requirements.txt
 ```
 
-### 4. Set up environment variables
+### Configure environment variables
 
-Copy each `.env.example` file and fill in your credentials:
+Copy the example files and update the values:
 
 ```bash
-cp frontend/.env.example frontend/.env
-cp backend/.env.example backend/.env
-cp pipeline/.env.example pipeline/.env
+copy frontend\.env.example frontend\.env
+copy backend\.env.example backend\.env
+copy pipeline\.env.example pipeline\.env
 ```
 
-See the [Environment Variables](#environment-variables) section below for details.
+If you are using macOS or Linux, replace `copy` with `cp`.
 
----
+### Environment variables
 
-## Running the Dev Servers
+`frontend/.env`
 
-Run both frontend and backend simultaneously from the root:
+- `VITE_API_URL`: optional backend override for local development
+- `VITE_MAPBOX_TOKEN`: Mapbox public token
+
+`backend/.env`
+
+- `PORT`: backend port, default `3001`
+- `SUPABASE_URL`: Supabase project URL
+- `SUPABASE_SERVICE_KEY`: Supabase service role key
+- `FRONTEND_ORIGIN`: exact frontend origin for CORS
+- `ENABLE_SWAGGER_DOCS`: set `true` to expose `/docs` in development
+
+`pipeline/.env`
+
+- `SUPABASE_URL`: Supabase project URL
+- `SUPABASE_SERVICE_KEY`: Supabase service role key
+- `MOVEBANK_USERNAME`: MoveBank username
+- `MOVEBANK_PASSWORD`: MoveBank password
+- `MOVEBANK_STUDY_IDS`: optional comma-separated study IDs to ingest
+
+## Running Locally
+
+Run both frontend and backend from the repo root:
 
 ```bash
 npm run dev
 ```
 
-Or run them individually:
+Or run them separately:
 
 ```bash
-npm run dev:frontend   # http://localhost:5173
-npm run dev:backend    # http://localhost:3001
+npm run dev:frontend
+npm run dev:backend
 ```
 
-Swagger UI for backend API docs is available at `http://localhost:3001/docs` when the backend server is running with `ENABLE_SWAGGER_DOCS=true` set in `backend/.env`.
+Default local URLs:
 
----
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:3001`
+- Swagger docs: `http://localhost:3001/docs` when `ENABLE_SWAGGER_DOCS=true`
 
-## Running the Data Pipeline
-
-The pipeline fetches animal tracking data from MoveBank, processes it with pandas, and loads it into Supabase.
+## Running the MoveBank Pipeline
 
 ```bash
 cd pipeline
 python src/ingest.py
 ```
 
-> Note: MoveBank allows only one concurrent request per IP. The pipeline is designed to run as a scheduled task, not in real-time.
+Pipeline behavior:
 
----
+1. Fetch MoveBank study metadata
+2. Fetch animals for each study
+3. Resolve and upsert species
+4. Upsert tracked animals
+5. Fetch event records
+6. Normalize and upsert sightings
 
-## Environment Variables
+Notes:
 
-### `frontend/.env`
+- MoveBank allows one concurrent request per IP
+- The pipeline is intended for scheduled ingestion, not real-time user requests
+- If `MOVEBANK_STUDY_IDS` is empty, the pipeline discovers GPS studies available to the configured account
 
-| Variable           | Description                          |
-|--------------------|--------------------------------------|
-| `VITE_API_URL`     | Optional local backend override for development (e.g. `http://localhost:3001`). Production traffic should use frontend `/api/*` rewrites instead. |
-| `VITE_MAPBOX_TOKEN`| Your Mapbox public access token      |
+## Deployment Notes
 
-### `backend/.env`
-
-| Variable               | Description                              |
-|------------------------|------------------------------------------|
-| `PORT`                 | Port for the Express server (default: `3001`) |
-| `SUPABASE_URL`         | Your Supabase project URL                |
-| `SUPABASE_SERVICE_KEY` | Supabase service role key (keep secret!) |
-| `FRONTEND_ORIGIN`      | Exact frontend origin for CORS with no trailing slash (e.g. `http://localhost:5173` or `https://wild-path-frontend-navy.vercel.app`) |
-
-### `pipeline/.env`
-
-| Variable               | Description                              |
-|------------------------|------------------------------------------|
-| `SUPABASE_URL`         | Your Supabase project URL                |
-| `SUPABASE_SERVICE_KEY` | Supabase service role key                |
-| `MOVEBANK_USERNAME`    | Your MoveBank account username           |
-| `MOVEBANK_PASSWORD`    | Your MoveBank account password           |
-
----
-
-## Contributing
-
-- **Do not push directly to `main`.** All changes go through pull requests.
-- Use a separate branch for each change:
-  - `feature/...` for new features (e.g. `feature/animal-selector`)
-  - `fix/...` for bug fixes (e.g. `fix/sightings-filter`)
-  - `style/...` for non-functional changes (e.g. formatting, docs)
-- Open a PR into `main` when the branch is ready; get a review before merging.
-
----
-
-## Vercel Deployment Notes
-
-- Frontend Vercel env:
-  - `VITE_MAPBOX_TOKEN`
-- Backend Vercel env:
-  - `FRONTEND_ORIGIN=https://wild-path-frontend-navy.vercel.app`
-  - plus the existing backend secrets such as `SUPABASE_URL` and `SUPABASE_SERVICE_KEY`
-- The frontend Vercel project should keep `frontend/vercel.json` so browser requests to `/api/*` are rewritten to `https://wild-path-backend.vercel.app/api/*`.
-- `VITE_API_URL` is useful for local development, but it is not the primary production fix because most app requests already use relative `/api/*` paths.
-
----
+- Frontend production site: `https://wild-path-frontend-navy.vercel.app/`
+- Frontend rewrites `/api/*` to the backend deployment using `frontend/vercel.json`
+- Backend production CORS should set `FRONTEND_ORIGIN=https://wild-path-frontend-navy.vercel.app`
+- Production frontend still requires `VITE_MAPBOX_TOKEN`
 
 ## Team
 
 **Team DRAKKN**
 
-- Daniel Dovale (Team Lead)
+- Daniel Dovale
 - Kaitlyn Tran
 - Arnav
 - Ronald
