@@ -169,7 +169,7 @@ export default function MapPage() {
 
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden">
-      <Navbar hideSearch />
+      <Navbar />
 
       <div className="flex flex-1 overflow-hidden">
         {/* sidebar */}
