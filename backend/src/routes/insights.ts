@@ -5,6 +5,13 @@ import { parseSightingsFilters } from '../lib/parseSightingsFilters'
 
 const router = Router()
 
+
+/**
+ * RPC returns bigint counts in JSON; the client parses them as JS `number`, which only preserves
+ * integers exactly up to `Number.MAX_SAFE_INTEGER` (2^53 − 1). Fine for MVP-scale aggregates; if
+ * counts could exceed that (e.g. billions), return counts as strings from SQL or another safe format.
+ */
+
 type AnimalRow = {
   animal_id: string
   animal_name: string | null
