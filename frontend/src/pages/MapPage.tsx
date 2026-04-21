@@ -12,7 +12,9 @@ import MovementPathsToggle from "../components/MovementPathsToggle";
 import { Switch } from "../components/ui/switch";
 import { Label } from "../components/ui/label";
 import { useMapFilters } from "../hooks/useMapFilters";
+import { useInsights } from "../hooks/useInsights";
 import { useMovementPaths } from "../hooks/useMovementPaths";
+import InsightsPanel from "../components/InsightsPanel";
 import { useGbifOccurrences } from "../hooks/useGbifOccurrences";
 import { useGbifDensityLayer } from "../hooks/useGbifDensityLayer";
 import { useMapMarkers } from "../hooks/useMapMarkers";
@@ -60,6 +62,7 @@ export default function MapPage() {
     setYearPreset,
     yearParam,
   } = useMapFilters();
+
   const selectedMovebankSpeciesId = speciesId ?? viewedSpeciesId;
   const movebankDisplayQuery = useMemo(() => {
     const params = new URLSearchParams(queryParams);
@@ -70,6 +73,24 @@ export default function MapPage() {
     }
     return params.toString();
   }, [queryParams, selectedMovebankSpeciesId]);
+
+  // Insights query uses the same params as movebankDisplayQuery
+  const insightsQueryParams = useMemo(() => {
+    const params: Record<string, string> = {};
+    const parsed = new URLSearchParams(movebankDisplayQuery);
+    parsed.forEach((value, key) => {
+      if (key !== "limit") {
+        params[key] = value;
+      }
+    });
+    return params;
+  }, [movebankDisplayQuery]);
+
+  const {
+    data: insightsData,
+    isLoading: insightsLoading,
+    isError: insightsError,
+  } = useInsights(insightsQueryParams, dataSource !== "gbif");
   const movebankVisibleAreaQuery = useMemo(() => {
     const params = new URLSearchParams(queryParams);
     params.delete("species_id");
@@ -364,6 +385,19 @@ export default function MapPage() {
               </div>
             </div>
           </section>
+
+          {/* Insights section */}
+          {dataSource !== "gbif" && (
+            <section className="relative z-0 px-4 pb-4">
+              <div className={SECTION_CARD_CLASS}>
+                <InsightsPanel
+                  data={insightsData}
+                  isLoading={insightsLoading}
+                  isError={insightsError}
+                />
+              </div>
+            </section>
+          )}
 
           {showSpeciesInArea && (
             <section className="relative z-0 px-4 pb-6">
