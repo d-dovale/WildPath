@@ -1,10 +1,22 @@
 import type { InsightsData } from "../hooks/useInsights";
 
+export interface GbifInsightsData {
+  totalOccurrences: number;
+  countriesCount: number;
+  sampleSize: number;
+  hasMoreResults: boolean;
+  latestDate: string | null;
+  byDay: { date: string; count: number }[];
+  byBasis: { label: string; count: number }[];
+}
+
 interface Props {
-  data: InsightsData | undefined;
+  source: "movebank" | "gbif";
+  data: InsightsData | GbifInsightsData | undefined;
   isLoading: boolean;
   isRefreshing: boolean;
   isError: boolean;
+  contextLabel?: string | null;
 }
 
 function buildLast14Days(byDay: { date: string; count: number }[]) {
@@ -51,17 +63,37 @@ const Heading = () => (
   </h2>
 );
 
+function SourceBadge({ source }: { source: "movebank" | "gbif" }) {
+  const className =
+    source === "gbif"
+      ? "bg-green-100 text-green-700"
+      : "bg-blue-100 text-blue-700";
+
+  return (
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${className}`}
+    >
+      {source === "gbif" ? "GBIF" : "MoveBank"}
+    </span>
+  );
+}
+
 export default function InsightsPanel({
+  source,
   data,
   isLoading,
   isRefreshing,
   isError,
+  contextLabel,
 }: Props) {
+  const isGbif = source === "gbif";
+
   if (isLoading && !data) {
     return (
       <div>
-        <div className="mb-4">
+        <div className="mb-4 flex items-center justify-between gap-2">
           <Heading />
+          <SourceBadge source={source} />
         </div>
         <div className="space-y-2 animate-pulse">
           <div className="h-10 rounded-xl bg-muted/30" />
@@ -75,33 +107,156 @@ export default function InsightsPanel({
   if (isError) {
     return (
       <div>
-        <div className="mb-4">
+        <div className="mb-4 flex items-center justify-between gap-2">
           <Heading />
+          <SourceBadge source={source} />
         </div>
-        <p className="text-xs text-destructive">Unable to load insights.</p>
+        <p className="text-xs text-destructive">
+          {isGbif ? "Unable to load GBIF insights." : "Unable to load insights."}
+        </p>
       </div>
     );
   }
 
-  if (!data || data.totalSightings === 0) {
+  if (!data) {
     return (
       <div>
-        <div className="mb-4">
+        <div className="mb-4 flex items-center justify-between gap-2">
           <Heading />
+          <SourceBadge source={source} />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {isGbif ? "Search for a GBIF species to see insights." : "No data for current filters."}
+        </p>
+      </div>
+    );
+  }
+
+  if (!isGbif && (data as InsightsData).totalSightings === 0) {
+    return (
+      <div>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <Heading />
+          <SourceBadge source={source} />
         </div>
         <p className="text-xs text-muted-foreground">No data for current filters.</p>
       </div>
     );
   }
 
+  if (isGbif && (data as GbifInsightsData).totalOccurrences === 0) {
+    return (
+      <div>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <Heading />
+          <SourceBadge source={source} />
+        </div>
+        <p className="text-xs text-muted-foreground">No GBIF occurrences for current filters.</p>
+      </div>
+    );
+  }
+
+  if (isGbif) {
+    const gbifData = data as GbifInsightsData;
+
+    return (
+      <div>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Heading />
+            <SourceBadge source={source} />
+          </div>
+          {isRefreshing && <span className="text-[10px] text-muted-foreground">Updating...</span>}
+        </div>
+
+        {contextLabel && (
+          <p className="mb-4 text-[10px] uppercase tracking-wider text-muted-foreground">
+            {contextLabel}
+          </p>
+        )}
+
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-muted/30 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground leading-tight mb-0.5">
+              Total occurrences
+            </p>
+            <p className="text-xl font-semibold leading-tight">
+              {gbifData.totalOccurrences.toLocaleString()}
+            </p>
+          </div>
+          <div className="rounded-xl bg-muted/30 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground leading-tight mb-0.5">
+              Countries
+            </p>
+            <p className="text-xl font-semibold leading-tight">
+              {gbifData.countriesCount.toLocaleString()}
+            </p>
+          </div>
+        </div>
+
+        {gbifData.byBasis.length > 0 && (
+          <div className="mb-4">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+              Record types
+            </p>
+            <div className="space-y-1.5">
+              {gbifData.byBasis.slice(0, 5).map((row) => (
+                <div key={row.label} className="flex items-center justify-between gap-2">
+                  <span className="truncate text-foreground/80 font-medium text-xs">
+                    {row.label}
+                  </span>
+                  <span className="text-foreground/80 font-medium text-xs">
+                    {row.count.toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {gbifData.byDay.length > 0 && (
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
+              Occurrence trend
+            </p>
+            <DailyTrend byDay={gbifData.byDay} />
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Latest 14 days in loaded results
+            </p>
+          </div>
+        )}
+
+        <div className="mt-4 space-y-1 text-[10px] text-muted-foreground">
+          <p>
+            Loaded {gbifData.sampleSize.toLocaleString()} result
+            {gbifData.sampleSize === 1 ? "" : "s"} for panel details.
+          </p>
+          {gbifData.hasMoreResults && (
+            <p>Totals may exceed the loaded map sample.</p>
+          )}
+          {gbifData.latestDate && <p>Latest occurrence: {gbifData.latestDate}</p>}
+        </div>
+      </div>
+    );
+  }
+
+  const movebankData = data as InsightsData;
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between gap-2">
-        <Heading />
-        {isRefreshing && (
-          <span className="text-[10px] text-muted-foreground">Updating...</span>
-        )}
+        <div className="flex items-center gap-2">
+          <Heading />
+          <SourceBadge source={source} />
+        </div>
+        {isRefreshing && <span className="text-[10px] text-muted-foreground">Updating...</span>}
       </div>
+
+      {contextLabel && (
+        <p className="mb-4 text-[10px] uppercase tracking-wider text-muted-foreground">
+          {contextLabel}
+        </p>
+      )}
 
       <div className="mb-4 grid grid-cols-2 gap-2">
         <div className="rounded-xl bg-muted/30 px-3 py-2">
@@ -109,7 +264,7 @@ export default function InsightsPanel({
             Total sightings
           </p>
           <p className="text-xl font-semibold leading-tight">
-            {data.totalSightings.toLocaleString()}
+            {movebankData.totalSightings.toLocaleString()}
           </p>
         </div>
         <div className="rounded-xl bg-muted/30 px-3 py-2">
@@ -117,18 +272,18 @@ export default function InsightsPanel({
             Active individuals
           </p>
           <p className="text-xl font-semibold leading-tight">
-            {data.byAnimal.length}
+            {movebankData.byAnimal.length}
           </p>
         </div>
       </div>
 
-      {data.byAnimal.length > 0 && (
+      {movebankData.byAnimal.length > 0 && (
         <div className="mb-4">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
             Top tracked individuals
           </p>
           <div className="space-y-1.5">
-            {data.byAnimal.slice(0, 5).map((row) => (
+            {movebankData.byAnimal.slice(0, 5).map((row) => (
               <div key={row.animal_id} className="flex items-center justify-between gap-2">
                 <div className="flex flex-col flex-1 min-w-0">
                   <span className="truncate text-foreground/80 font-medium text-xs">
@@ -148,21 +303,21 @@ export default function InsightsPanel({
                 </div>
               </div>
             ))}
-            {data.byAnimal.length > 5 && (
+            {movebankData.byAnimal.length > 5 && (
               <p className="text-[10px] text-muted-foreground">
-                +{data.byAnimal.length - 5} more
+                +{movebankData.byAnimal.length - 5} more
               </p>
             )}
           </div>
         </div>
       )}
 
-      {data.byDay.length > 0 && (
+      {movebankData.byDay.length > 0 && (
         <div>
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2">
             Daily trend
           </p>
-          <DailyTrend byDay={data.byDay} />
+          <DailyTrend byDay={movebankData.byDay} />
           <p className="mt-1 text-[10px] text-muted-foreground">
             Latest 14 days in results
           </p>

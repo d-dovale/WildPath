@@ -14,7 +14,7 @@ import { Label } from "../components/ui/label";
 import { useMapFilters } from "../hooks/useMapFilters";
 import { useInsights } from "../hooks/useInsights";
 import { useMovementPaths } from "../hooks/useMovementPaths";
-import InsightsPanel from "../components/InsightsPanel";
+import InsightsPanel, { type GbifInsightsData } from "../components/InsightsPanel";
 import { useGbifOccurrences } from "../hooks/useGbifOccurrences";
 import { useGbifDensityLayer } from "../hooks/useGbifDensityLayer";
 import { useMapMarkers } from "../hooks/useMapMarkers";
@@ -129,13 +129,58 @@ export default function MapPage() {
   // GBIF occurrences — only active when in GBIF mode
   const {
     sightings: gbifSightings,
+    rawOccurrences,
     totalCount: gbifTotalCount,
     isLoading: gbifLoading,
+    error: gbifError,
   } = useGbifOccurrences(dataSource === "gbif" ? gbifTaxonKey : null, {
     bbox,
     bboxEnabled,
     year: yearParam,
   });
+
+  const gbifInsightsData = useMemo<GbifInsightsData | undefined>(() => {
+    if (dataSource !== "gbif" || gbifTaxonKey === null) {
+      return undefined;
+    }
+
+    const countrySet = new Set<string>();
+    const basisCount = new Map<string, number>();
+    const byDayCount = new Map<string, number>();
+    let latestDate: string | null = null;
+
+    rawOccurrences.forEach((occurrence) => {
+      if (occurrence.country) {
+        countrySet.add(occurrence.country);
+      }
+
+      const basisLabel = occurrence.basisOfRecord || "Unknown";
+      basisCount.set(basisLabel, (basisCount.get(basisLabel) ?? 0) + 1);
+
+      if (occurrence.eventDate) {
+        const parsedDate = new Date(occurrence.eventDate);
+        if (!Number.isNaN(parsedDate.getTime())) {
+          const dateKey = parsedDate.toISOString().slice(0, 10);
+          byDayCount.set(dateKey, (byDayCount.get(dateKey) ?? 0) + 1);
+          latestDate = latestDate === null || dateKey > latestDate ? dateKey : latestDate;
+        }
+      }
+    });
+
+    return {
+      totalOccurrences: gbifTotalCount,
+      countriesCount: countrySet.size,
+      sampleSize: rawOccurrences.length,
+      hasMoreResults: gbifTotalCount > rawOccurrences.length,
+      latestDate,
+      byDay: [...byDayCount.entries()]
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+      byBasis: [...basisCount.entries()]
+        .map(([label, count]) => ({ label, count }))
+        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)),
+    };
+  }, [dataSource, gbifTaxonKey, rawOccurrences, gbifTotalCount]);
 
   // Select active data based on source
   const isGbifMode = dataSource === "gbif" && gbifTaxonKey !== null;
@@ -386,18 +431,25 @@ export default function MapPage() {
           </section>
 
           {/* Insights section */}
-          {dataSource !== "gbif" && (
-            <section className="relative z-0 px-4 pb-4">
-              <div className={SECTION_CARD_CLASS}>
-                <InsightsPanel
-                  data={insightsData}
-                  isLoading={insightsLoading}
-                  isRefreshing={insightsFetching && !!insightsData}
-                  isError={insightsError}
-                />
-              </div>
-            </section>
-          )}
+          <section className="relative z-0 px-4 pb-4">
+            <div className={SECTION_CARD_CLASS}>
+              <InsightsPanel
+                source={isGbifMode ? "gbif" : "movebank"}
+                data={isGbifMode ? gbifInsightsData : insightsData}
+                isLoading={isGbifMode ? gbifLoading : insightsLoading}
+                isRefreshing={isGbifMode ? false : insightsFetching && !!insightsData}
+                isError={isGbifMode ? !!gbifError : insightsError}
+                contextLabel={
+                  isGbifMode
+                    ? (gbifBestMatch?.vernacularName ??
+                      gbifBestMatch?.canonicalName ??
+                      gbifBestMatch?.scientificName ??
+                      null)
+                    : null
+                }
+              />
+            </div>
+          </section>
 
           {showSpeciesInArea && (
             <section className="relative z-0 px-4 pb-6">
