@@ -121,4 +121,4 @@ At the end of the quiz, the score screen shows your final score and lets you res
 
 Current project ERD reference:
 
-![WildPath ERD](docs/images/wildpath-complete-erd.png)
+![WildPath ERD](https://i.ibb.co/WpNJ6Z1y/Wild-Path-Complete-ERD.png)
