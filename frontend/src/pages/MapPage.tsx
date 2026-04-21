@@ -8,12 +8,14 @@ import GbifSpeciesInfoCard from "../components/GbifSpeciesInfoCard";
 import SpeciesInArea from "../components/SpeciesInArea";
 import TimeRangeFilter from "../components/TimeRangeFilter";
 import GbifYearFilter from "../components/GbifYearFilter";
+import Map3DToggle from "../components/Map3DToggle";
 import MovementPathsToggle from "../components/MovementPathsToggle";
 import { Switch } from "../components/ui/switch";
 import { Label } from "../components/ui/label";
 import { useMapFilters } from "../hooks/useMapFilters";
 import { useInsights } from "../hooks/useInsights";
 import { useMovementPaths } from "../hooks/useMovementPaths";
+import { useMap3DView } from "../hooks/useMap3DView";
 import InsightsPanel, { type GbifInsightsData } from "../components/InsightsPanel";
 import { useGbifOccurrences } from "../hooks/useGbifOccurrences";
 import { useGbifDensityLayer } from "../hooks/useGbifDensityLayer";
@@ -40,6 +42,7 @@ export default function MapPage() {
   const [showPaths, setShowPaths] = useState(false);
   const [viewedSpeciesId, setViewedSpeciesId] = useState<string | null>(null);
   const [showDensity, setShowDensity] = useState(true);
+  const [show3DView, setShow3DView] = useState(false);
   const [gbifBestMatch, setGbifBestMatch] = useState<GbifSearchResult | null>(
     null,
   );
@@ -230,6 +233,7 @@ export default function MapPage() {
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: "mapbox://styles/mapbox/outdoors-v12",
+      antialias: true,
       projection: { name: "globe" },
       center: [-98, 38],
       zoom: 3,
@@ -263,6 +267,12 @@ export default function MapPage() {
     sightings: isGbifMode ? undefined : movebankSightings,
     map: mapInstance,
     enabled: showPaths && !isGbifMode,
+    mapReady,
+  });
+
+  useMap3DView({
+    enabled: show3DView,
+    map: mapInstance,
     mapReady,
   });
 
@@ -359,6 +369,11 @@ export default function MapPage() {
                     }}
                   />
                 </div>
+
+                <Map3DToggle
+                  checked={show3DView}
+                  onCheckedChange={setShow3DView}
+                />
 
                 {isGbifMode && (
                   <div className="flex items-center justify-between">
