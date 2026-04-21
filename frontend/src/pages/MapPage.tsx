@@ -28,6 +28,8 @@ mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 const ENABLE_MAP = true;
 const SECTION_CARD_CLASS =
   "rounded-[1.75rem] border border-white/15 bg-white/8 px-5 py-5 shadow-[0_12px_30px_rgba(0,0,0,0.12)] backdrop-blur-sm";
+const SPECIES_CARD_CLASS =
+  "rounded-[1.75rem] border border-white/15 bg-white/8 px-5 pt-5 pb-4 shadow-[0_12px_30px_rgba(0,0,0,0.12)] backdrop-blur-sm";
 
 export default function MapPage() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -97,9 +99,7 @@ export default function MapPage() {
   }, [queryParams]);
 
   // MoveBank sightings shown on the map — only when a species is selected
-  const { data: movebankSightings, isLoading: movebankLoading } = useQuery<
-    Sighting[]
-  >({
+  const { data: movebankSightings } = useQuery<Sighting[]>({
     queryKey: ["sightings", "selected", movebankDisplayQuery],
     queryFn: async () => {
       const res = await fetch(`/api/sightings?${movebankDisplayQuery}`);
@@ -187,7 +187,6 @@ export default function MapPage() {
   const activeSightings = isGbifMode
     ? gbifSightings
     : (movebankSightings ?? []);
-  const isLoading = isGbifMode ? gbifLoading : movebankLoading;
   const hasSpeciesDetail =
     (isGbifMode && gbifTaxonKey !== null) ||
     (!isGbifMode && (speciesId !== null || viewedSpeciesId !== null));
@@ -276,7 +275,7 @@ export default function MapPage() {
         <aside className="z-10 flex w-80 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-sm">
           {/* Species section */}
           <section className="relative z-20 px-4 pb-4 pt-4">
-            <div className={SECTION_CARD_CLASS}>
+            <div className={SPECIES_CARD_CLASS}>
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
                 Species
               </h2>
@@ -303,49 +302,6 @@ export default function MapPage() {
                   }
                 }}
               />
-
-              {/* Sighting count and source indicator */}
-              <div className="text-sm font-medium mt-2">
-                {isLoading ? (
-                  <span className="flex items-center gap-2 text-blue-500 animate-pulse">
-                    Loading sightings...
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">
-                    {isGbifMode ? (
-                      <>
-                        {activeSightings.length} occurrences
-                        <span className="inline-block ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
-                          GBIF
-                        </span>
-                        {gbifTotalCount > 300 && (
-                          <span className="block text-xs mt-1 text-muted-foreground">
-                            Showing 300 of {gbifTotalCount.toLocaleString()}{" "}
-                            total.
-                            {showDensity
-                              ? " Density layer shows full range."
-                              : " Enable density layer for full coverage."}
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        Found {activeSightings.length} locations
-                        <span className="inline-block ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                          MoveBank
-                        </span>
-                        {bboxEnabled &&
-                          bbox &&
-                          activeSightings.length === 0 && (
-                            <span className="block text-xs mt-1">
-                              Try zooming out or disabling viewport filter
-                            </span>
-                          )}
-                      </>
-                    )}
-                  </span>
-                )}
-              </div>
               {hasSpeciesDetail ? (
                 <div className="mt-5 border-t border-white/12 pt-5 space-y-5">
                   {isGbifMode && gbifTaxonKey && (
@@ -461,23 +417,6 @@ export default function MapPage() {
                 />
               </div>
             </section>
-          )}
-
-          {/* GBIF attribution */}
-          {isGbifMode && (
-            <div className="px-6 pb-4 mt-auto">
-              <p className="text-xs text-muted-foreground">
-                Occurrence data from{" "}
-                <a
-                  href="https://www.gbif.org"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  GBIF.org
-                </a>
-              </p>
-            </div>
           )}
         </aside>
 
