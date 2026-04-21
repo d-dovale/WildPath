@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type { FocusEvent, KeyboardEvent } from "react";
-import { Check, Search, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { useGbifSearch } from "@/hooks/useGbifSearch";
 import type { DataSource } from "@/hooks/useMapFilters";
 import type { GbifSearchResult } from "@/types/gbif";
@@ -257,24 +257,6 @@ export default function SpeciesSearch({
           </p>
         )}
 
-        {selectedSpecies && (
-          <>
-            <p className="flex items-center gap-1 text-xs text-green-600">
-              <Check className="h-3 w-3 shrink-0" />
-              <span>
-                Selected{" "}
-                <span className="font-medium">{getPrimaryLabel(selectedSpecies)}</span>
-              </span>
-            </p>
-            <button
-              onClick={handleClear}
-              className="mt-0.5 text-xs text-primary hover:underline"
-              type="button"
-            >
-              Show all MoveBank data
-            </button>
-          </>
-        )}
       </div>
     </div>
   );

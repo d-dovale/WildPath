@@ -11,7 +11,7 @@ Typical map + insights usage:
 1. **`GET /api/species?q=…`** — User searches; each row’s **`id`** is **`species.id`** (not an individual animal).
 2. **Pick one species** — Store that **`id`** as the value for **`species_id`** on the next calls.
 3. **`GET /api/sightings`** — Pass **`species_id`**, optional **`bbox`**, **`start`**, **`end`**, **`limit`**. Rows include **`animal_id`** (`animals.id`, the tracked individual) and coordinates for markers.
-4. **`GET /api/insights`** — Use the **same** **`species_id`**, **`bbox`**, **`start`**, **`end`** as sightings (omit relying on **`limit`** for totals). Response: **`totalSightings`**, **`byAnimal`** (counts per **`animal_id`**), **`byDay`** (UTC dates).
+4. **`GET /api/insights`** — Use the **same** **`species_id`**, **`bbox`**, **`start`**, **`end`** as sightings (omit relying on **`limit`** for totals). Response: **`totalSightings`**, **`byAnimal`** (counts per **`animal_id`** plus optional display names), **`byDay`** (UTC dates).
 
 Omitting **`species_id`** means no species filter (all species in bbox/time, subject to sightings **`limit`** on the list endpoint).
 
@@ -116,7 +116,7 @@ Body: object:
 | Field            | Type   | Description                                  |
 |------------------|--------|----------------------------------------------|
 | `totalSightings` | number | Total count of sightings matching the filters |
-| `byAnimal`       | array  | `[{ animal_id (UUID), count (number) }]` — per tracked individual (`animals.id`), descending by count |
+| `byAnimal`       | array  | `[{ animal_id (UUID), animal_name (string|null), species_common_name (string|null), count (number) }]` — per tracked individual (`animals.id`), descending by count |
 | `byDay`          | array  | `[{ date (string), count (number) }]` — UTC calendar date `YYYY-MM-DD` |
 
 **Example request:**
@@ -131,7 +131,12 @@ GET /api/insights?species_id=550e8400-e29b-41d4-a716-446655440000&start=2024-01-
 {
   "totalSightings": 1250,
   "byAnimal": [
-    { "animal_id": "22222222-0000-0000-0000-000000000001", "count": 800 }
+    {
+      "animal_id": "22222222-0000-0000-0000-000000000001",
+      "animal_name": "Wolf A12",
+      "species_common_name": "Gray Wolf",
+      "count": 800
+    }
   ],
   "byDay": [
     { "date": "2024-01-15", "count": 42 },

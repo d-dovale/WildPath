@@ -12,7 +12,9 @@ import MovementPathsToggle from "../components/MovementPathsToggle";
 import { Switch } from "../components/ui/switch";
 import { Label } from "../components/ui/label";
 import { useMapFilters } from "../hooks/useMapFilters";
+import { useInsights } from "../hooks/useInsights";
 import { useMovementPaths } from "../hooks/useMovementPaths";
+import InsightsPanel, { type GbifInsightsData } from "../components/InsightsPanel";
 import { useGbifOccurrences } from "../hooks/useGbifOccurrences";
 import { useGbifDensityLayer } from "../hooks/useGbifDensityLayer";
 import { useMapMarkers } from "../hooks/useMapMarkers";
@@ -26,6 +28,8 @@ mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN;
 const ENABLE_MAP = true;
 const SECTION_CARD_CLASS =
   "rounded-[1.75rem] border border-white/15 bg-white/8 px-5 py-5 shadow-[0_12px_30px_rgba(0,0,0,0.12)] backdrop-blur-sm";
+const SPECIES_CARD_CLASS =
+  "rounded-[1.75rem] border border-white/15 bg-white/8 px-5 pt-5 pb-4 shadow-[0_12px_30px_rgba(0,0,0,0.12)] backdrop-blur-sm";
 
 export default function MapPage() {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -60,6 +64,7 @@ export default function MapPage() {
     setYearPreset,
     yearParam,
   } = useMapFilters();
+
   const selectedMovebankSpeciesId = speciesId ?? viewedSpeciesId;
   const movebankDisplayQuery = useMemo(() => {
     const params = new URLSearchParams(queryParams);
@@ -70,6 +75,23 @@ export default function MapPage() {
     }
     return params.toString();
   }, [queryParams, selectedMovebankSpeciesId]);
+
+  // Insights query uses the same params as movebankDisplayQuery
+  const insightsQueryParams = useMemo(() => {
+    const parsed = new URLSearchParams(movebankDisplayQuery);
+    const sortedEntries = [...parsed.entries()]
+      .filter(([key]) => key !== "limit")
+      .sort(([a], [b]) => a.localeCompare(b));
+
+    return new URLSearchParams(sortedEntries).toString();
+  }, [movebankDisplayQuery]);
+
+  const {
+    data: insightsData,
+    isLoading: insightsLoading,
+    isFetching: insightsFetching,
+    isError: insightsError,
+  } = useInsights(insightsQueryParams, dataSource !== "gbif");
   const movebankVisibleAreaQuery = useMemo(() => {
     const params = new URLSearchParams(queryParams);
     params.delete("species_id");
@@ -77,9 +99,7 @@ export default function MapPage() {
   }, [queryParams]);
 
   // MoveBank sightings shown on the map — only when a species is selected
-  const { data: movebankSightings, isLoading: movebankLoading } = useQuery<
-    Sighting[]
-  >({
+  const { data: movebankSightings } = useQuery<Sighting[]>({
     queryKey: ["sightings", "selected", movebankDisplayQuery],
     queryFn: async () => {
       const res = await fetch(`/api/sightings?${movebankDisplayQuery}`);
@@ -109,20 +129,64 @@ export default function MapPage() {
   // GBIF occurrences — only active when in GBIF mode
   const {
     sightings: gbifSightings,
+    rawOccurrences,
     totalCount: gbifTotalCount,
     isLoading: gbifLoading,
+    error: gbifError,
   } = useGbifOccurrences(dataSource === "gbif" ? gbifTaxonKey : null, {
     bbox,
     bboxEnabled,
     year: yearParam,
   });
 
+  const gbifInsightsData = useMemo<GbifInsightsData | undefined>(() => {
+    if (dataSource !== "gbif" || gbifTaxonKey === null) {
+      return undefined;
+    }
+
+    const countrySet = new Set<string>();
+    const basisCount = new Map<string, number>();
+    const byDayCount = new Map<string, number>();
+    let latestDate: string | null = null;
+
+    rawOccurrences.forEach((occurrence) => {
+      if (occurrence.country) {
+        countrySet.add(occurrence.country);
+      }
+
+      const basisLabel = occurrence.basisOfRecord || "Unknown";
+      basisCount.set(basisLabel, (basisCount.get(basisLabel) ?? 0) + 1);
+
+      if (occurrence.eventDate) {
+        const parsedDate = new Date(occurrence.eventDate);
+        if (!Number.isNaN(parsedDate.getTime())) {
+          const dateKey = parsedDate.toISOString().slice(0, 10);
+          byDayCount.set(dateKey, (byDayCount.get(dateKey) ?? 0) + 1);
+          latestDate = latestDate === null || dateKey > latestDate ? dateKey : latestDate;
+        }
+      }
+    });
+
+    return {
+      totalOccurrences: gbifTotalCount,
+      countriesCount: countrySet.size,
+      sampleSize: rawOccurrences.length,
+      hasMoreResults: gbifTotalCount > rawOccurrences.length,
+      latestDate,
+      byDay: [...byDayCount.entries()]
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date)),
+      byBasis: [...basisCount.entries()]
+        .map(([label, count]) => ({ label, count }))
+        .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)),
+    };
+  }, [dataSource, gbifTaxonKey, rawOccurrences, gbifTotalCount]);
+
   // Select active data based on source
   const isGbifMode = dataSource === "gbif" && gbifTaxonKey !== null;
   const activeSightings = isGbifMode
     ? gbifSightings
     : (movebankSightings ?? []);
-  const isLoading = isGbifMode ? gbifLoading : movebankLoading;
   const hasSpeciesDetail =
     (isGbifMode && gbifTaxonKey !== null) ||
     (!isGbifMode && (speciesId !== null || viewedSpeciesId !== null));
@@ -211,7 +275,7 @@ export default function MapPage() {
         <aside className="z-10 flex w-80 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-sm">
           {/* Species section */}
           <section className="relative z-20 px-4 pb-4 pt-4">
-            <div className={SECTION_CARD_CLASS}>
+            <div className={SPECIES_CARD_CLASS}>
               <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
                 Species
               </h2>
@@ -238,49 +302,6 @@ export default function MapPage() {
                   }
                 }}
               />
-
-              {/* Sighting count and source indicator */}
-              <div className="text-sm font-medium mt-2">
-                {isLoading ? (
-                  <span className="flex items-center gap-2 text-blue-500 animate-pulse">
-                    Loading sightings...
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">
-                    {isGbifMode ? (
-                      <>
-                        {activeSightings.length} occurrences
-                        <span className="inline-block ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
-                          GBIF
-                        </span>
-                        {gbifTotalCount > 300 && (
-                          <span className="block text-xs mt-1 text-muted-foreground">
-                            Showing 300 of {gbifTotalCount.toLocaleString()}{" "}
-                            total.
-                            {showDensity
-                              ? " Density layer shows full range."
-                              : " Enable density layer for full coverage."}
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        Found {activeSightings.length} locations
-                        <span className="inline-block ml-1.5 text-xs font-medium px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                          MoveBank
-                        </span>
-                        {bboxEnabled &&
-                          bbox &&
-                          activeSightings.length === 0 && (
-                            <span className="block text-xs mt-1">
-                              Try zooming out or disabling viewport filter
-                            </span>
-                          )}
-                      </>
-                    )}
-                  </span>
-                )}
-              </div>
               {hasSpeciesDetail ? (
                 <div className="mt-5 border-t border-white/12 pt-5 space-y-5">
                   {isGbifMode && gbifTaxonKey && (
@@ -365,6 +386,27 @@ export default function MapPage() {
             </div>
           </section>
 
+          {/* Insights section */}
+          <section className="relative z-0 px-4 pb-4">
+            <div className={SECTION_CARD_CLASS}>
+              <InsightsPanel
+                source={isGbifMode ? "gbif" : "movebank"}
+                data={isGbifMode ? gbifInsightsData : insightsData}
+                isLoading={isGbifMode ? gbifLoading : insightsLoading}
+                isRefreshing={isGbifMode ? false : insightsFetching && !!insightsData}
+                isError={isGbifMode ? !!gbifError : insightsError}
+                contextLabel={
+                  isGbifMode
+                    ? (gbifBestMatch?.vernacularName ??
+                      gbifBestMatch?.canonicalName ??
+                      gbifBestMatch?.scientificName ??
+                      null)
+                    : null
+                }
+              />
+            </div>
+          </section>
+
           {showSpeciesInArea && (
             <section className="relative z-0 px-4 pb-6">
               <div className={SECTION_CARD_CLASS}>
@@ -375,23 +417,6 @@ export default function MapPage() {
                 />
               </div>
             </section>
-          )}
-
-          {/* GBIF attribution */}
-          {isGbifMode && (
-            <div className="px-6 pb-4 mt-auto">
-              <p className="text-xs text-muted-foreground">
-                Occurrence data from{" "}
-                <a
-                  href="https://www.gbif.org"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  GBIF.org
-                </a>
-              </p>
-            </div>
           )}
         </aside>
 

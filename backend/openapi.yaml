@@ -236,8 +236,12 @@ paths:
                 totalSightings: 1250
                 byAnimal:
                   - animal_id: "22222222-0000-0000-0000-000000000001"
+                    animal_name: "Wolf A12"
+                    species_common_name: "Gray Wolf"
                     count: 800
                   - animal_id: "22222222-0000-0000-0000-000000000002"
+                    animal_name: null
+                    species_common_name: "Gray Wolf"
                     count: 450
                 byDay:
                   - date: "2024-01-15"
@@ -335,6 +339,14 @@ components:
         animal_id:
           type: string
           format: uuid
+        animal_name:
+          type: string
+          nullable: true
+          description: Display name for the tracked animal when available.
+        species_common_name:
+          type: string
+          nullable: true
+          description: Common name of the animal's species when available.
         count:
           type: integer
           format: int64
