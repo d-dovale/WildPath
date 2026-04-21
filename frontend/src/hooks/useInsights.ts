@@ -11,11 +11,7 @@ export type InsightsData = {
   byDay: { date: string; count: number }[];
 };
 
-export function useInsights(queryParams: Record<string, string>, enabled = true) {
-  const qs = new URLSearchParams(
-    Object.fromEntries(Object.entries(queryParams).filter(([k]) => k !== "limit")),
-  ).toString();
-
+export function useInsights(qs: string, enabled = true) {
   return useQuery<InsightsData>({
     queryKey: ["insights", qs],
     queryFn: async () => {
@@ -24,6 +20,7 @@ export function useInsights(queryParams: Record<string, string>, enabled = true)
       return res.json();
     },
     enabled,
+    placeholderData: (previousData) => previousData,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     retry: false,

@@ -76,19 +76,18 @@ export default function MapPage() {
 
   // Insights query uses the same params as movebankDisplayQuery
   const insightsQueryParams = useMemo(() => {
-    const params: Record<string, string> = {};
     const parsed = new URLSearchParams(movebankDisplayQuery);
-    parsed.forEach((value, key) => {
-      if (key !== "limit") {
-        params[key] = value;
-      }
-    });
-    return params;
+    const sortedEntries = [...parsed.entries()]
+      .filter(([key]) => key !== "limit")
+      .sort(([a], [b]) => a.localeCompare(b));
+
+    return new URLSearchParams(sortedEntries).toString();
   }, [movebankDisplayQuery]);
 
   const {
     data: insightsData,
     isLoading: insightsLoading,
+    isFetching: insightsFetching,
     isError: insightsError,
   } = useInsights(insightsQueryParams, dataSource !== "gbif");
   const movebankVisibleAreaQuery = useMemo(() => {
@@ -393,6 +392,7 @@ export default function MapPage() {
                 <InsightsPanel
                   data={insightsData}
                   isLoading={insightsLoading}
+                  isRefreshing={insightsFetching && !!insightsData}
                   isError={insightsError}
                 />
               </div>

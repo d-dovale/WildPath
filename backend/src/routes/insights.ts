@@ -26,11 +26,20 @@ type InsightsPayload = {
 }
 
 async function enrichWithNames(rows: AnimalRow[]): Promise<AnimalRow[]> {
-  const ids = rows.map((r) => r.animal_id)
-  const { data: animals } = await supabase
+  const ids = [...new Set(rows.map((r) => r.animal_id))]
+  if (ids.length === 0) {
+    return rows
+  }
+
+  const { data: animals, error } = await supabase
     .from('animals')
     .select('id, name, species:species_id(common_name)')
     .in('id', ids)
+
+  if (error) {
+    throw error
+  }
+
   const infoMap = new Map(
     (animals ?? []).map((a) => [
       a.id,

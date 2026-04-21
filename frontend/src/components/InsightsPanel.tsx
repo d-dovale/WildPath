@@ -3,13 +3,22 @@ import type { InsightsData } from "../hooks/useInsights";
 interface Props {
   data: InsightsData | undefined;
   isLoading: boolean;
+  isRefreshing: boolean;
   isError: boolean;
 }
 
 function buildLast14Days(byDay: { date: string; count: number }[]) {
+  if (byDay.length === 0) {
+    return [];
+  }
+
   const countByDate = new Map(byDay.map((d) => [d.date, d.count]));
+  const latestDate = byDay.reduce((latest, entry) => {
+    return entry.date > latest ? entry.date : latest;
+  }, byDay[0].date);
+
   return Array.from({ length: 14 }, (_, i) => {
-    const d = new Date();
+    const d = new Date(`${latestDate}T00:00:00Z`);
     d.setUTCDate(d.getUTCDate() - (13 - i));
     const date = d.toISOString().slice(0, 10);
     return { date, count: countByDate.get(date) ?? 0 };
@@ -37,16 +46,23 @@ function DailyTrend({ byDay }: { byDay: { date: string; count: number }[] }) {
 }
 
 const Heading = () => (
-  <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+  <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
     Insights
   </h2>
 );
 
-export default function InsightsPanel({ data, isLoading, isError }: Props) {
-  if (isLoading) {
+export default function InsightsPanel({
+  data,
+  isLoading,
+  isRefreshing,
+  isError,
+}: Props) {
+  if (isLoading && !data) {
     return (
       <div>
-        <Heading />
+        <div className="mb-4">
+          <Heading />
+        </div>
         <div className="space-y-2 animate-pulse">
           <div className="h-10 rounded-xl bg-muted/30" />
           <div className="h-10 rounded-xl bg-muted/30" />
@@ -59,7 +75,9 @@ export default function InsightsPanel({ data, isLoading, isError }: Props) {
   if (isError) {
     return (
       <div>
-        <Heading />
+        <div className="mb-4">
+          <Heading />
+        </div>
         <p className="text-xs text-destructive">Unable to load insights.</p>
       </div>
     );
@@ -68,7 +86,9 @@ export default function InsightsPanel({ data, isLoading, isError }: Props) {
   if (!data || data.totalSightings === 0) {
     return (
       <div>
-        <Heading />
+        <div className="mb-4">
+          <Heading />
+        </div>
         <p className="text-xs text-muted-foreground">No data for current filters.</p>
       </div>
     );
@@ -76,9 +96,14 @@ export default function InsightsPanel({ data, isLoading, isError }: Props) {
 
   return (
     <div>
-      <Heading />
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <Heading />
+        {isRefreshing && (
+          <span className="text-[10px] text-muted-foreground">Updating...</span>
+        )}
+      </div>
 
-      <div className="grid grid-cols-2 gap-2 mb-4">
+      <div className="mb-4 grid grid-cols-2 gap-2">
         <div className="rounded-xl bg-muted/30 px-3 py-2">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground leading-tight mb-0.5">
             Total sightings
@@ -138,7 +163,9 @@ export default function InsightsPanel({ data, isLoading, isError }: Props) {
             Daily trend
           </p>
           <DailyTrend byDay={data.byDay} />
-          <p className="text-[10px] text-muted-foreground mt-1">Last 14 days</p>
+          <p className="mt-1 text-[10px] text-muted-foreground">
+            Latest 14 days in results
+          </p>
         </div>
       )}
     </div>
